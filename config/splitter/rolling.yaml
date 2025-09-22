@@ -1,0 +1,4 @@
+name: RollingSplitter
+test_ratio: 0.2
+train_window_days: 100 # 504
+valid_window_days: 50  # 252

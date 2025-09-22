@@ -1,0 +1,4 @@
+name: KFoldSpliiter
+k_blocks: 6
+n_subblocks: 4
+seed: 42

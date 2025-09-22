@@ -1,0 +1,13 @@
+name: CTTS
+agent_input_dim: 8
+timeseries_embed_dim: 32
+kernel_size: 4
+stride: 1
+agent_hidden_dim: 32
+agent_out_dim: 32
+fusion_hidden_dim: 64
+num_layers: 3
+num_heads: 4
+d_ff: 64
+dropout: 0.1
+

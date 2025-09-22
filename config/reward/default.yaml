@@ -1,0 +1,8 @@
+w_profit: 0.4
+w_risk: 0.4
+w_regret: 0.2
+margin_call_penalty: -2.0
+maturity_date_penalty: -0.5
+bankrupt_penalty: -5.0
+goal_reward_bonus: 2.0
+

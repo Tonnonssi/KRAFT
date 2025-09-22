@@ -1,0 +1,10 @@
+defaults:
+  - run: default
+  - agent: ppo
+  - env: default
+  - dataset: default
+  - action: default
+  - reward: default
+  - model: ctts
+  - splitter: rolling
+  - _self_
