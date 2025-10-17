@@ -63,7 +63,7 @@ class BaseEnvironment(ABC):
         # ====== INFO ===================================
 
         self.current_timestep = self.target_df.index[0]# 현재 시간 
-        self.event = Event()                           # Status Info 
+        self.event = Event()                              # Status Info 
 
         self.since_entry = 0                         # 새로운 진입 이후 누적 스텝 수
         self.maintained = 0                          # 스윙 전략 유지 스텝 수  
@@ -295,7 +295,7 @@ class BaseEnvironment(ABC):
     @property
     def done_n_event(self):
         """ current timestep의 Event """
-        step_event = Event()
+        step_events = Event()
 
         checks = self.checks()
         done_lst = []
@@ -303,7 +303,7 @@ class BaseEnvironment(ABC):
         for check in checks:
             done, event = check()
             done_lst.append(done)
-            step_event + event
+            step_events + event
 
             if event == 'end_of_data':
                 # 만기일 확인까지 넘어가면 안된다. 
