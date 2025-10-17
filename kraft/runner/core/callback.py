@@ -363,29 +363,31 @@ class VisualizationCallback(Callback):
     def on_valid_end(self, logs=None):
         dataset_flag = logs['dataset_flag']
         model_type = logs['model_type']
+        
+        if len(self.event_list) < 20:
+            long_lst, short_lst = self._split_long_short(self.entry_action_list)
 
-        long_lst, short_lst = self._split_long_short(self.entry_action_list)
+            fig, ax = plt.subplots(
+                nrows=8,
+                ncols=1,
+                figsize=(22, 18),
+                constrained_layout=True,
+                gridspec_kw={'height_ratios': [1.1, 2.0, 1.6, 1.3, 1.6, 1.8, 1.2, 1.2]}
+            )
+            self.get_valid_info(ax[0], logs)
+            plot_market_with_actions(ax[1], self.timestep_list, self.close_price_list, self.action_list, self.maintained_vol_list)
+            # plot_both_pnl_ticks(ax[2], self.timestep_list, self.unrealized_pnl_list, self.net_realized_pnl_list)
+            plot_histogram_with_stats(ax[3], self.step_reward_list, title="Step Reward Distribution")
+            plot_event_per_episodes(ax[4], self.event_list)
+            plot_action_distribution_heatmap(ax[5], self.timestep_list, self.action_list)
+            plot_long_short(ax[6], long_lst, short_lst, title='Entry Action Distribution')
+            plot_realized_pnl(ax[7], self.timestep_list, self.cum_realized_pnl_list)
 
-        fig, ax = plt.subplots(
-            nrows=8,
-            ncols=1,
-            figsize=(22, 18),
-            constrained_layout=True,
-            gridspec_kw={'height_ratios': [1.1, 2.0, 1.6, 1.3, 1.6, 1.8, 1.2, 1.2]}
-        )
-        self.get_valid_info(ax[0], logs)
-        plot_market_with_actions(ax[1], self.timestep_list, self.close_price_list, self.action_list, self.maintained_vol_list)
-        plot_both_pnl_ticks(ax[2], self.timestep_list, self.unrealized_pnl_list, self.net_realized_pnl_list)
-        plot_histogram_with_stats(ax[3], self.step_reward_list, title="Step Reward Distribution")
-        plot_event_per_episodes(ax[4], self.event_list)
-        plot_action_distribution_heatmap(ax[5], self.timestep_list, self.action_list)
-        plot_long_short(ax[6], long_lst, short_lst, title='Entry Action Distribution')
-        plot_realized_pnl(ax[7], self.timestep_list, self.cum_realized_pnl_list)
-
-        path = self._get_directory(f'ValidI{dataset_flag}_{model_type}')
-        fig.savefig(path)
-        self.logging(f"✅ 시각화 저장 완료: {path}")
-
+            path = self._get_directory(f'ValidI{dataset_flag}_{model_type}')
+            fig.savefig(path)
+            self.logging(f"✅ 시각화 저장 완료: {path}")
+        else:
+            self.logging("⚠️ 시각화 생략: 에피소드가 너무 많음 (>20) 검증 가치가 X")
 
     def on_episode_end(self, logs=None): 
         logs = logs or {}

@@ -1,9 +1,9 @@
-fname: sample
+fname: ProfitnRiskClipped
 agent_class: PPOAgent
 env: EpisodicStreamEnv
 timeseries_network: CTTS
 train_epoch: 10
-print_step_log_in: 10
+print_step_log_in: 100
 print_episode_log_in: 1
 print_env_log_in: 30
 save_interval: 10

@@ -110,7 +110,7 @@ class PPOAgent:
         surrogate2 = torch.clamp(ratio, 1 - self.clip_eps, 1 + self.clip_eps) * advantage
         return torch.min(surrogate1, surrogate2).mean()
     
-    def cal_advantage(self, memory, normalize=False):
+    def cal_advantage(self, memory, normalize=True):
         '''
         cal_advantage(memory: list[tuple], lam: float) -> torch.Tensor
 

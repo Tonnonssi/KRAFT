@@ -59,6 +59,7 @@ class Account:
         self.total_transaction_costs = 0        # 총 수수료 (KRW)
 
         # 이전 정보
+        self.prev_realized_pnl = 0              # 이전 누적 실현 손익 (KRW)
         self.prev_unrealized_pnl = 0            # 이전 미실현 손익 
         self.prev_balance = 0                   # 이전 자산 
         self.prev_position = 0                  # 이전 포지션, 표기 방식은 위와 동일 
@@ -73,6 +74,8 @@ class Account:
         # 이전 정보: 포지션, 미실현 손익 저장 
         self.prev_position = self.current_position
         self.prev_unrealized_pnl = self.unrealized_pnl
+        self.prev_realized_pnl = self.realized_pnl
+        self.prev_balance = self.available_balance
 
         # 초기화 
         self.net_realized_pnl = 0
@@ -102,7 +105,8 @@ class Account:
         
         # timestep 업데이트
         self.current_timestep = next_timestep
-        
+        self.net_realized_pnl = self.realized_pnl - self.prev_realized_pnl
+
         # 정보 업데이트
         self._update_account(market_pt)
 
@@ -176,9 +180,6 @@ class Account:
             # 계좌 변동
             self.available_balance += settled_initial_margin + net_pnl
             self.margin_deposit -= settled_initial_margin
-
-        # 순수 실현 손익 업데이트 
-        self.net_realized_pnl = net_pnl
 
         if get_pnl:
             return net_pnl
