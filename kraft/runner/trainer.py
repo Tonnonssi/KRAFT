@@ -18,6 +18,7 @@ class Trainer:
         self.scaler = scaler_class()
         self.df = df
         self.config = config 
+        self.early_stop = False 
 
         # set 
         self.device = get_device()
@@ -102,10 +103,11 @@ class Trainer:
 
         self.agent.load_model(state_dict)
         self.agent.model.eval()
-        with torch.no_grad():
-            result = run_loop(env, self.agent, 
-                            self.config.agent.batch_size, self.config.agent.n_steps, 
-                            is_training=False, device=self.device, callbacks=self.callbacks)            
+        while not self.early_stop:
+            with torch.no_grad():
+                result = run_loop(env, self.agent, 
+                                self.config.agent.batch_size, self.config.agent.n_steps, 
+                                is_training=False, device=self.device, callbacks=self.callbacks)            
         
         # 검증 종료 
         for cb in self.callbacks:
