@@ -89,9 +89,10 @@ class RRPAReward:
     def _calculate_profit_reward(self, info: RewardInfo) -> float:
         """수익 컴포넌트(R_profit) 계산"""
         # 장기 
-        realized_term = self.log(info.net_realized_pnl)
-        unrealized_term = self.log(info.current_unrealized_pnl - info.prev_unrealized_pnl)
-        return realized_term + unrealized_term
+        realized_term = info.net_realized_pnl
+        unrealized_term = info.current_unrealized_pnl - info.prev_unrealized_pnl
+        # return self.log(realized_term) + self.log(unrealized_term)
+        return self.log(realized_term + unrealized_term) # balance base
 
     def _calculate_risk_reward(self, info: RewardInfo) -> float:
         """위험 컴포넌트(R_risk) 계산"""
@@ -134,4 +135,4 @@ class RRPAReward:
 
         final_reward = self._apply_event_bonus_penalty(base_reward, event, reward_info)
         
-        return np.clip(final_reward, -100.0, 100.0)
+        return np.clip(final_reward, -2,2)

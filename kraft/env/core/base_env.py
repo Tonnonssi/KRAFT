@@ -76,6 +76,7 @@ class BaseEnvironment(ABC):
         self.n_win_trades = 0                        # 수익을 본 거래 횟수 
 
         self.maturity_timesteps = get_maturity_timesteps(date_range[0], raw_df)
+        print(len(self.maturity_timesteps), "maturity dates found.")
         
         # ====== BUDGET ==================================
 
