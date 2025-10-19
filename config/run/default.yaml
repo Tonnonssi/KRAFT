@@ -1,4 +1,4 @@
-fname: ProfitnRiskClipped
+fname: ProfitnRiskClipped_marketRegimeMasked01
 agent_class: PPOAgent
 env: EpisodicStreamEnv
 timeseries_network: CTTS

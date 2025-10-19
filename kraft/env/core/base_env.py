@@ -260,7 +260,7 @@ class BaseEnvironment(ABC):
                     unrealized_pnl=self.account.unrealized_pnl,   
                     available_balance=self.account.available_balance,
                     cost=self.account.total_transaction_costs,
-                    market_regime=self.market_regime)
+                    market_regime=0)    # self.market_regime
     
     @property
     def market_regime(self):
