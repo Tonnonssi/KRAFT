@@ -1,6 +1,5 @@
 import torch
 import numpy as np
-from collections import Counter
 
 def run_episode(env, agent, n_steps, device, callbacks=None):
     """
@@ -15,7 +14,6 @@ def run_episode(env, agent, n_steps, device, callbacks=None):
     mask = env.mask
 
     epi_memory = []
-    event_list = []
     epi_reward = 0
 
     for idx in range(n_steps):
@@ -33,13 +31,12 @@ def run_episode(env, agent, n_steps, device, callbacks=None):
         # UPDATE 
         state = next_state
         epi_reward += reward
-        event_list.append(env.event())
 
         if callbacks:
             for cb in callbacks:
                 cb.on_step_end(get_step_log(env, decoded_action, reward, idx))
 
-    return epi_memory, epi_reward, event_list
+    return epi_memory, epi_reward, env.episode_event
     
 def run_loop(env, agent, batch_size, n_steps, is_training: bool, device, callbacks=None):
     """
@@ -57,10 +54,8 @@ def run_loop(env, agent, batch_size, n_steps, is_training: bool, device, callbac
     while not env.terminated:
         # 1. 에피소드 실행 (공통)
         # is_training 플래그를 전달하여 에이전트가 탐험(train) 또는 결정적 행동(valid/test)을 하도록 제어할 수 있음
-        epi_memory, epi_reward, _event_list = run_episode(env, agent, n_steps, device, callbacks)
+        epi_memory, epi_reward, episode_event = run_episode(env, agent, n_steps, device, callbacks)
         _episode_cum_reward += epi_reward
-
-        event_bin = dict(Counter(_event_list))
 
         # 2. 학습 로직 (is_training=True일 때만 실행)
         if is_training:
@@ -101,14 +96,14 @@ def run_loop(env, agent, batch_size, n_steps, is_training: bool, device, callbac
             'cumulative_reward': _episode_cum_reward,
             'loss': loss, # 학습하지 않을 때는 None
             'done': env.done,
-            'is_bankrupt': 'bankrupt' in env.event,
+            'is_margin': 'margin_call' in env.episode_event,
             'maintained_steps': env.maintained
         })
 
         # 4. 
         if callbacks:
             for cb in callbacks:
-                cb.on_episode_end(get_episode_log(env, agent, loss, event_bin, epi_reward, idx))
+                cb.on_episode_end(get_episode_log(env, agent, loss, episode_event, epi_reward, idx))
         
         # 5. 에피소드 종료 시 처리 (공통)
         if env.done:
@@ -127,7 +122,7 @@ def get_extra_memory(env, decoded_action):
         'current_timestep' : env.current_timestep,
         'unrealized_pnl' : env.account.unrealized_pnl,
         'net_realized_pnl' : env.account.net_realized_pnl,
-        'main_event' : env.event(),
+        'main_event' : env.step_event(),
         'decoded_action' : decoded_action,
         'current_position' : current_position,
         'execution_strength' : execution_strength, 
@@ -148,7 +143,7 @@ def get_step_log(env, decoded_action, step_reward, idx):
         'unrealized_pnl' : env.account.unrealized_pnl,
         'cum_realized_pnl' : env.account.realized_pnl,
         'net_realized_pnl' : env.account.net_realized_pnl,
-        'event' : env.event(),
+        'event' : env.step_event(),
         'maintained_vol' : env.maintained,
         'action' : decoded_action,
         'entry_action' : entry_action,
@@ -156,15 +151,16 @@ def get_step_log(env, decoded_action, step_reward, idx):
         'step_reward' : step_reward
     }
 
-def get_episode_log(env, agent, loss, event_list, epi_reward, idx):
+def get_episode_log(env, agent, loss, episode_event, epi_reward, idx):
     """에피소드 단위 Callback에 필요한 파라미터들"""
     model_state = {k: v.detach().cpu().clone() for k, v in agent.model.state_dict().items()}
     return {
        'loss' : loss,
        'pnl' : env.account.realized_pnl,
        'epi_reward' : epi_reward,
-       'event_list' : event_list,
-       'winrate' : env.n_win_trades / env.n_total_trades,
+       'event' : episode_event(),
+       'event_dict' : episode_event.event_dict,
+       'winrate' : (env.n_win_trades / env.n_total_trades) if env.n_total_trades else 0.0,
        'maintained' : env.maintained,
        'pnl_ratio' : env.account.realized_pnl / env.account.initial_budget,
        'index' : idx,
