@@ -65,9 +65,9 @@ def find_nearest_later_timestep(list_of_timesteps, target_time):
     list_of_timesteps: 정렬된 pd.Timestamp 리스트
     target_time: pd.Timestamp
     """
-    list_of_timesteps = [pd.Timestamp(t) for t in list_of_timesteps]
-    target_time = pd.Timestamp(target_time)
-    
+    list_of_timesteps = [pd.Timestamp(t).date() for t in list_of_timesteps]
+    target_time = pd.Timestamp(target_time).date()
+
     idx = bisect.bisect_left(list_of_timesteps, target_time)
 
     if idx < len(list_of_timesteps):
@@ -78,19 +78,22 @@ def find_nearest_later_timestep(list_of_timesteps, target_time):
 
 def get_n_days_before_maturity(maturity_list, current_timestep):
 
-    current_timestep = pd.Timestamp(current_timestep)
+    current_timestep = pd.Timestamp(current_timestep).date()
     nearest_timestep = find_nearest_later_timestep(maturity_list, current_timestep)
+
+    delta = nearest_timestep - current_timestep
+    diff = delta.days
     
     if nearest_timestep == None:
         # 더 늦은 만기일이 없는 경우 
         return 0 
     else:
         # 가장 근접한 만기일과 현재 날짜를 비교 
-        return (nearest_timestep - current_timestep).days
+        return diff
 
 def get_maturity_timesteps(start_timestep, raw_df):
     """ 시작 시점 이후 만기일을 전부 찾는다"""
     mask = raw_df.index >= pd.to_datetime(start_timestep)
-    dates = raw_df.loc[mask].index.normalize().unique()
+    dates = raw_df.loc[mask].index.normalize().unique()  # 중복 제거된 날짜 리스트
     maturity_list = calculate_maturity(dates)
-    return pd.to_datetime(maturity_list)
+    return pd.to_datetime(maturity_list).date

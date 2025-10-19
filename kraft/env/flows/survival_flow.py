@@ -10,7 +10,7 @@ class SurvivalFlow(BaseEnvironment):
         """
         if self.done:
             self._reset_base()
-            if self.event in self.reset_done:
+            if self.episode_event in self.reset_done:
                 state = self._reset_to_init_timestep()
             else:
                 state = self._reset_state()

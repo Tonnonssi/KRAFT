@@ -9,6 +9,7 @@ print_env_log_in: 30
 save_interval: 10
 log_on: true
 timer_on: true
+earlystop_on: true
 checkpoint_on: true
 visualization_on: true
 seed: 42

@@ -1,3 +1,5 @@
+import pandas as pd
+
 def is_day_changed(current_timestep, next_timestep):
     """
     날짜를 기준으로 구분한다. 
@@ -19,10 +21,15 @@ def is_maturity_data(maturity_list, next_timestep, current_timestep):
     만기일의 마지막 데이터인가?
     done=True
     """
-    is_maturity_date = current_timestep.date() in maturity_list
+    current_norm = pd.Timestamp(current_timestep).normalize()
+    maturity_index = pd.DatetimeIndex(pd.to_datetime(maturity_list)).normalize()
+    is_maturity_date = current_norm in maturity_index
     day_changed = is_day_changed(current_timestep, next_timestep)
     
     done = is_maturity_date and day_changed
+    if done:
+        print(f"ℹ️  만기일 도달: {current_timestep}")
+
     info = 'maturity_data' if done else ''
 
     return done, info 
@@ -44,6 +51,8 @@ def is_margin_call(available_balance, maintenance_margin):
     """
     done = (available_balance <= maintenance_margin)
     info = 'margin_call' if done else ''
+    # if done:
+        # print(f"⚠️  마진콜 발생: 가용 잔고 {available_balance:.2f} / 유지 증거금 {maintenance_margin:.2f}")
     return done, info
 
 def check_insufficient(account):
@@ -54,6 +63,8 @@ def check_insufficient(account):
     # 장기 
     condition = account.is_insufficient_for_new_contract
     info = 'insufficient' if condition else ''
+    # if condition:
+    #     print(f"⚠️  계약 체결 불가: 가용 잔고 {account.available_balance:.2f} / 유지 증거금 {account.maintenance_margin:.2f}")
     return False, info
 
 def is_max_step(max_steps, maintained_steps):
@@ -74,28 +85,45 @@ def is_over_pnl_ratio_threshold(realized_pnl_ratio, threshold):
     info = 'goal_profit' if condition else ''
     return False, info 
 
-def checks_non_episodic(account, dataset, maturity_timesteps, current_timestep, next_timestep, threshold, **kwargs):
+def check_loss_percentage(realized_pnl_ratio):
+    """
+    손실률이 일정 수준을 넘었는가? 
+    done=False
+    """ 
+    if realized_pnl_ratio <= -0.50:
+        info = 'loss_more_than_50percent' 
+    elif realized_pnl_ratio <= -0.25:
+        info = 'loss_more_than_25percent' 
+    elif realized_pnl_ratio <= -0.05:
+        info = 'loss_more_than_5percent' 
+    else:
+        info = ''
+    return False, info
+
+def checks_non_episodic(account, dataset, maturity_timesteps, current_timestep, next_timestep, two_ticks_later, threshold, **kwargs):
     """ 
     상태를 판단하는 여러 함수들
     Standard인 Episodic과 달리 max_steps가 제외됨
     """
     return [    
-    lambda: is_bankrupt(account.available_balance),
+    # lambda: is_bankrupt(account.available_balance),
     lambda: is_margin_call(account.available_balance, account.maintenance_margin),
     lambda: check_insufficient(account),   
     lambda: reached_end_of_dataset(dataset, current_timestep),
-    lambda: is_maturity_data(maturity_timesteps, next_timestep, current_timestep),
-    lambda: is_over_pnl_ratio_threshold(account.net_realized_pnl / account.initial_budget, threshold)
+    lambda: is_maturity_data(maturity_timesteps, two_ticks_later, current_timestep),
+    lambda: is_over_pnl_ratio_threshold(account.realized_pnl / account.initial_budget, threshold),
+    lambda: check_loss_percentage(account.realized_pnl / account.initial_budget)
     ]
 
-def checks_episodic(account, dataset, max_steps, maintained, maturity_timesteps, current_timestep, next_timestep, threshold):
+def checks_episodic(account, dataset, max_steps, maintained, maturity_timesteps, current_timestep, next_timestep, two_ticks_later, threshold):
     """ 상태를 판단하는 여러 함수들"""
     return [    
-    lambda: is_bankrupt(account.available_balance),
+    # lambda: is_bankrupt(account.available_balance),
     lambda: is_margin_call(account.available_balance, account.maintenance_margin),
     lambda: is_max_step(max_steps, maintained),
     lambda: check_insufficient(account),   
     lambda: reached_end_of_dataset(dataset, current_timestep),
-    lambda: is_maturity_data(maturity_timesteps, next_timestep, current_timestep),
-    lambda: is_over_pnl_ratio_threshold(account.net_realized_pnl / account.initial_budget, threshold)
+    lambda: is_maturity_data(maturity_timesteps, two_ticks_later, current_timestep),
+    lambda: is_over_pnl_ratio_threshold(account.realized_pnl / account.initial_budget, threshold),
+    lambda: check_loss_percentage(account.realized_pnl / account.initial_budget)
     ]
