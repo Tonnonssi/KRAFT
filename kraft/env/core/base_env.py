@@ -7,7 +7,7 @@ from .features.dataset import FuturesDataset
 from .features.risk import *
 from .features.state import State, AgentState
 from .features.account import Account
-from .features.event import Event
+from .features.event import Event, StepEvent
 
 from .utils.done_conditions import *
 from .utils.reward_schemes import *
@@ -63,7 +63,9 @@ class BaseEnvironment(ABC):
         # ====== INFO ===================================
 
         self.current_timestep = self.target_df.index[0]# 현재 시간 
-        self.event = Event()                              # Status Info 
+
+        self.episode_event = Event()                 # 에피소드 전체 tracker
+        self.step_event = self.episode_event.step_event # 스텝 단위 tracker
 
         self.since_entry = 0                         # 새로운 진입 이후 누적 스텝 수
         self.maintained = 0                          # 스윙 전략 유지 스텝 수  
@@ -117,10 +119,11 @@ class BaseEnvironment(ABC):
         net_pnl, cost = self._execute_action(decoded_action)
 
         # 3) 종료 여부/이벤트 판정
-        done, self.event = self.done_n_event
+        done, step_events_list = self.done_n_event
+        self.episode_event.collect_information(step_events_list)
 
-        # 4) 필요 시 강제 청산(만기/파산 등)
-        if self.event in self.liquidation_status_list and self.current_point is not None:
+        # 4) 필요 시 강제 청산 (만기/파산 등)
+        if self.step_event in self.liquidation_status_list and self.current_point is not None:
             liq_pnl, liq_cost = self._maybe_liquidate(self.current_point)
             net_pnl += liq_pnl
             cost += liq_cost
@@ -133,7 +136,7 @@ class BaseEnvironment(ABC):
         next_state_obj = self._build_next_state(next_ts_state)
 
         # 7) 보상 계산
-        reward = self._compute_reward(event=self.event)
+        reward = self._compute_reward(event=self.step_event)
 
         # 8) 마스크/관찰 준비
         mask = self.mask
@@ -153,9 +156,11 @@ class BaseEnvironment(ABC):
         return next_ts_state
     
     def _update_trades_info(self):
-        self.n_total_trades += 1
-        if self.account.prev_balance < self.account.balance:
-            self.n_win_trades += 1
+        # 거래 성공 횟수, 손익 실현 횟수 업데이트 
+        if self.account.settled:
+            self.n_total_trades += 1
+            if self.account.net_realized_pnl > 0:
+                self.n_win_trades += 1
 
     def _execute_action(self, decoded_action: int) -> Tuple[float, float]:
         """계좌에 행동을 반영하고 손익/비용을 수집."""
@@ -174,7 +179,7 @@ class BaseEnvironment(ABC):
         """다음 관찰(State 객체) 구성."""
         return State(timeseries_state=next_ts_state, agent_state=self.agent_state)
 
-    def _compute_reward(self, event:Event) -> float:
+    def _compute_reward(self, event:StepEvent) -> float:
         """RewardInfo를 구성해 보상 계산."""
         rinfo = RewardInfo(
             net_realized_pnl=self.account.net_realized_pnl,
@@ -206,7 +211,7 @@ class BaseEnvironment(ABC):
     def _reset_base(self):
         """기본으로 초기화되어야 하는 것"""
         self.account.reset()
-        self.event = Event()
+        self.episode_event = Event()
 
         self.since_entry = 0
         self.maintained = 0
@@ -289,6 +294,18 @@ class BaseEnvironment(ABC):
         return None
     
     @property
+    def two_ticks_later(self):
+        """두 타임스텝 뒤 시간"""
+        pos_arr = self.dataset_df.index.get_indexer([self.current_timestep])
+        if pos_arr[0] == -1:  # current_timestep이 없는 경우
+            return None
+
+        next_pos = pos_arr[0] + 2
+        if next_pos < len(self.dataset_df.index):
+            return self.dataset_df.index[next_pos]
+        return None
+    
+    @property
     def is_entry(self):
         """청산 후 첫 진입인지 확인"""
         return bool((self.account.prev_position == 0) & (self.account.current_position != 0))
@@ -296,7 +313,7 @@ class BaseEnvironment(ABC):
     @property
     def done_n_event(self):
         """ current timestep의 Event """
-        step_events = Event()
+        step_events = []
 
         checks = self.checks()
         done_lst = []
@@ -304,16 +321,16 @@ class BaseEnvironment(ABC):
         for check in checks:
             done, event = check()
             done_lst.append(done)
-            step_events + event
+            step_events.append(event)
 
-            if event == 'end_of_data':
-                # 만기일 확인까지 넘어가면 안된다. 
-                # next_timestep이 존재하지 않기 때문이다. 
-                break 
+            # if event == 'end_of_data':
+            #     # 만기일 확인까지 넘어가면 안된다. 
+            #     # next_timestep이 존재하지 않기 때문이다. 
+            #     break 
 
         self.done = bool(sum(done_lst) != 0) 
 
-        return self.done, step_event
+        return self.done, step_events
 
     @property
     def mask(self) -> List:
@@ -329,7 +346,7 @@ class BaseEnvironment(ABC):
         # 기본 마스크 생성
         mask = np.ones(n, dtype=np.int32)
 
-        if (self.position_cap == remaining_strength) or ('insufficient' in self.event):
+        if (self.position_cap == remaining_strength) or ('insufficient' in self.step_event):
             # 최대 체결 가능 계약수에 도달했을 때 
             # 자본금 부족으로 새로운 포지션을 체결할 수 없을 때 
             if position == -1: # short 
