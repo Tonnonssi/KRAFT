@@ -7,6 +7,7 @@ class NonEpisodicStreamEnv(StreamFlow):
                                     self.maturity_timesteps, 
                                     self.current_timestep, 
                                     self.next_timestep,
+                                    self.two_ticks_later,
                                     self.pnl_threshold)
 
     
@@ -16,4 +17,5 @@ class NonEpisodicSurvivalEnv(SurvivalFlow):
                                     self.maturity_timesteps, 
                                     self.current_timestep, 
                                     self.next_timestep,
+                                    self.two_ticks_later,
                                     self.pnl_threshold)
