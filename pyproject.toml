@@ -20,11 +20,12 @@ dependencies = [
     "omegaconf>=2.3",
     "PyYAML>=6.0",
     "captum==0.8.0",
+    "pytest>=8.4.2",
     "plotly==6.3.1"
 ]
 
 [tool.setuptools]
-packages = ["kraft"]
+packages = { find = { include = ["kraft", "kraft.*"] } }
 
 [project.optional-dependencies]
 dev = ["ipykernel", "jupyter", "pytest", "ruff"]
