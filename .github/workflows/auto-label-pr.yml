@@ -1,0 +1,63 @@
+name: Auto Label & Assign (Personal)
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+permissions:
+  pull-requests: write
+  issues: write
+  contents: read
+
+jobs:
+  label-and-assign:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply labels & assign author
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const body = pr?.body || "";
+
+            const CANDIDATES = [
+              "Feature","Bug Fix","Refactor","Performance","Docs",
+              "Infra/CI","Data","Experiment","Hotfix"
+            ];
+
+            // 체크된 항목 추출: "- [x] Label"
+            const picked = CANDIDATES.filter(k =>
+              new RegExp(`- \$begin:math:display$x\\$end:math:display$ ${k}\\b`, "i").test(body)
+            );
+
+            // 라벨 미리 생성(없으면 생성)
+            for (const name of picked) {
+              try {
+                await github.rest.issues.getLabel({
+                  owner: context.repo.owner, repo: context.repo.repo, name
+                });
+              } catch {
+                await github.rest.issues.createLabel({
+                  owner: context.repo.owner, repo: context.repo.repo,
+                  name, color: "BFD4F2"
+                });
+              }
+            }
+
+            if (picked.length) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: pr.number, labels: picked
+              });
+            }
+
+            // 개인 프로젝트: PR 작성자를 자동 Assignee로 지정
+            const author = pr.user?.login;
+            if (author) {
+              await github.rest.issues.addAssignees({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: pr.number, assignees: [author]
+              });
+            }
+
+            core.info(`Labels: ${picked.join(", ") || "(none)"} | Assignee: ${author || "(none)"}`);
