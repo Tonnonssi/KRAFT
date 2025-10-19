@@ -57,6 +57,13 @@ class CheckpointCallback(Callback):
         if idx is not None and model is not None and idx % 10 == 0:
             self.trainer.per_steps_model.append(model)
 
+    def on_train_end(self, logs=None):
+        """학습 중에 저장된 여러 모델을 저장한다."""
+        logs = logs or {}
+        dataset_flag = logs.get("dataset_flag", "N/A")
+        self.save_model_to(self.trainer.models_path, dataset_flag)
+    
+
     def save_model_to(self, path, dataset_flag):
         """모든 신경망 가중치를 저장한다."""
         # 최고 보상 모델 저장

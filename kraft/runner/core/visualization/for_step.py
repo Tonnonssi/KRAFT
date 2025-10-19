@@ -9,11 +9,25 @@ def plot_realized_pnl(ax, timesteps, realized_pnl, title: str = "Realized PnL Ov
     ts = np.asarray(timesteps)
     y = np.asarray(realized_pnl, dtype=float)
 
+    if y.size == 0:
+        ax.text(0.5, 0.5, "실현 손익 데이터가 없습니다.", ha="center", va="center")
+        ax.set_axis_off()
+        return
+
+    valid_mask = np.isfinite(y)
+    if not np.any(valid_mask):
+        ax.text(0.5, 0.5, "실현 손익 데이터가 모두 누락되었습니다.", ha="center", va="center")
+        ax.set_axis_off()
+        return
+
+    # NaN은 통계 계산에서 제외하되 그래프에는 0으로 표시
+    y_plot = np.where(valid_mask, y, 0.0)
+
     x = np.arange(len(y))
 
     # main line
-    ax.plot(x, y, linewidth=2.0, color="#3498DB", label="Realized PnL")  # elegant blue
-    ax.fill_between(x, np.minimum(y, 0), 0, color="#AED6F1", alpha=0.4, step=None)  # soft negative area
+    ax.plot(x, y_plot, linewidth=2.0, color="#3498DB", label="Realized PnL")  # elegant blue
+    ax.fill_between(x, np.minimum(y_plot, 0), 0, color="#AED6F1", alpha=0.4, step=None)  # soft negative area
 
     # zero line
     ax.axhline(0, color="gray", linewidth=1.0, linestyle="--")
@@ -23,9 +37,16 @@ def plot_realized_pnl(ax, timesteps, realized_pnl, title: str = "Realized PnL Ov
     min_idx = int(np.nanargmin(y))
     final_idx = len(y) - 1
 
-    max_val = int(y[max_idx])
-    min_val = int(y[min_idx])
-    final_val = int(y[final_idx])
+    max_val = float(y[max_idx])
+    min_val = float(y[min_idx])
+    final_val = float(y[final_idx])
+
+    if not np.isfinite(max_val):
+        max_val = float(y_plot[max_idx])
+    if not np.isfinite(min_val):
+        min_val = float(y_plot[min_idx])
+    if not np.isfinite(final_val):
+        final_val = float(y_plot[final_idx])
 
     # annotation helper
     def annotate_point(ix, val, label, color, va='bottom'):
@@ -42,9 +63,12 @@ def plot_realized_pnl(ax, timesteps, realized_pnl, title: str = "Realized PnL Ov
         )
 
     # annotate max / min / final
-    annotate_point(max_idx, max_val, "Max", "#E74C3C", va='bottom')  # red
-    annotate_point(min_idx, min_val, "Min", "#2E86C1", va='top')     # blue
-    annotate_point(final_idx, final_val, "Final", "#27AE60", va='bottom')  # green
+    if np.isfinite(max_val):
+        annotate_point(max_idx, max_val, "Max", "#E74C3C", va='bottom')  # red
+    if np.isfinite(min_val):
+        annotate_point(min_idx, min_val, "Min", "#2E86C1", va='top')     # blue
+    if np.isfinite(final_val):
+        annotate_point(final_idx, final_val, "Final", "#27AE60", va='bottom')  # green
 
     # axes & labels
     ax.set_title(title, fontsize=14)

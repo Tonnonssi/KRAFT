@@ -51,6 +51,8 @@ def build_callbacks(cfg):
         instances.append(CheckpointCallback())
     if cfg.run.visualization_on:
         instances.append(VisualizationCallback())
+    if cfg.run.earlystop_on:
+        instances.append(EarlyStoppingCallback())
 
     return instances
 

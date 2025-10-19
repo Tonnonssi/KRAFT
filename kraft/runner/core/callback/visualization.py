@@ -61,10 +61,11 @@ class VisualizationCallback(Callback):
         logs = logs or {}
         self.loss_list.append(logs['loss'])
         self.reward_list.append(logs['epi_reward'])
-        self.event_list.append(logs['event_list'])
         self.winrate_list.append(logs['winrate'])
         self.maintained_list.append(logs['maintained'])
         self.pnl_ratio_list.append(logs['pnl_ratio'])
+        self.event_list.append(logs['event_dict'])
+        # print(logs['event_dict'])   
 
     def on_step_end(self, logs=None): 
         self.timestep_list.append(logs['timestep'])
@@ -72,7 +73,6 @@ class VisualizationCallback(Callback):
         self.unrealized_pnl_list.append(logs['unrealized_pnl'])
         self.cum_realized_pnl_list.append(logs['cum_realized_pnl'])
         self.net_realized_pnl_list.append(logs['net_realized_pnl'])
-        self.step_event_list.append(logs['event'])
         self.maintained_vol_list.append(logs['maintained_vol'])
         self.action_list.append(logs['action'])
         self.entry_action_list.append(logs['entry_action'])
@@ -204,10 +204,10 @@ class VisualizationCallback(Callback):
     def _reset_epi_traker(self):
         self.loss_list = []
         self.reward_list = []
-        self.event_list = []
         self.winrate_list = []
         self.maintained_list = []
         self.pnl_ratio_list = []
+        self.event_list = []
 
     def _reset_step_traker(self):
         self.timestep_list = []
@@ -215,7 +215,6 @@ class VisualizationCallback(Callback):
         self.unrealized_pnl_list = []
         self.cum_realized_pnl_list = []
         self.net_realized_pnl_list = []
-        self.step_event_list = []
         self.maintained_vol_list = []
         self.action_list = []
         self.entry_action_list = []

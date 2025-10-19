@@ -118,7 +118,7 @@ class LoggingCallback(Callback):
     def on_episode_end(self, logs=None):
         """
         VisualizationCallback / CheckpointCallback 에서 사용하는 키만 활용:
-          - loss, epi_reward, event_list, winrate, maintained, pnl_ratio
+          - loss, epi_reward, episode_event, winrate, maintained, pnl_ratio
           - pnl, index, model (Checkpoint), (선택) dataset_flag
         """
         logs = logs or {}
@@ -129,14 +129,7 @@ class LoggingCallback(Callback):
         mlen  = logs.get("maintained")
         pr    = logs.get("pnl_ratio")
         pnl   = logs.get("pnl")
-        evn   = logs.get("event_list")
-
-        if isinstance(evn, dict):
-            event_repr = ", ".join(f"{k}:{v}" for k, v in evn.items()) or "None"
-        elif isinstance(evn, (list, tuple)):
-            event_repr = evn[-1] if evn else "None"
-        else:
-            event_repr = str(evn)
+        evn   = logs.get("event")
 
         if (idx is None) or (self.print_every_episode and (idx % self.print_every_episode == 0)):
             idx_label = f"{idx:>4}" if idx is not None else "   -"
@@ -148,7 +141,7 @@ class LoggingCallback(Callback):
                 f"maintained={self._fmt(mlen, 0, 4)} | "
                 f"pnl_ratio={self._fmt_percent(pr, 9)} | "
                 f"pnl={self._fmt_currency(pnl, 0, 18)} | "
-                f"events={event_repr}"
+                f"events={evn}"
             )
 
     def on_step_end(self, logs=None):
@@ -166,11 +159,11 @@ class LoggingCallback(Callback):
             upnl = logs.get("unrealized_pnl")
             crp  = logs.get("cum_realized_pnl")
             nrp  = logs.get("net_realized_pnl")
-            ev   = logs.get("event")
-            mv   = logs.get("maintained_vol")
+            # ev   = logs.get("event")
+            # mv   = logs.get("maintained_vol")
             act  = logs.get("action")
-            ent  = logs.get("entry_action")
-            liq  = logs.get("liquidation_action")
+            # ent  = logs.get("entry_action")
+            # liq  = logs.get("liquidation_action")
             r    = logs.get("step_reward")
             step_label = "----" if t is None else f"{t:>4}"
             self.logging(
@@ -180,5 +173,5 @@ class LoggingCallback(Callback):
                 f"cumPnL={self._fmt_currency(crp, 0, 16)} | "
                 f"netPnL={self._fmt_currency(nrp, 0, 16)} | "  
                 f"act={str(act):>3} | "
-                f"r={self._fmt(r,2,7)} | event={ev}"
+                f"r={self._fmt(r,2,7)}" #  | event={ev}
             )
