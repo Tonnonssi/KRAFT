@@ -65,6 +65,9 @@ class Account:
         self.prev_position = 0                  # 이전 포지션, 표기 방식은 위와 동일 
         self.prev_timestep = None               # 이전 시간 
 
+        self.settled = False                    # 계약 청산 여부
+        self.concluded = False                  # 계약 체결 여부
+
     def step(self, decoded_action, market_pt, next_timestep):
         '''
         action, market point에 따라 계좌, 포지션 업데이트
@@ -79,6 +82,8 @@ class Account:
 
         # 초기화 
         self.net_realized_pnl = 0
+        self.settled = False                 
+        self.concluded = False
 
         # 순 실현 손익과 비용 초기화 
         realized_net_pnl = 0
@@ -122,6 +127,7 @@ class Account:
         '''
         
         self.current_position = position    # 포지션 업데이트
+        self.concluded = True
 
         # 명목 가치와 초기 증거금 계산 
         name_value = vol * market_pt        
@@ -148,6 +154,8 @@ class Account:
         - 현재 열려있는 계약에 대해 vol만큼 청산
         - 만약 열려있는 계약 수보다 반대 포지션을 더 많이 체결한 경우 나머지에 대해 새로운 계약 추가
         '''
+        self.settled = True                    
+
         if vol >= self.execution_strength:  # 기존 체결 강도보다 많은 반대 계약 체결 시
             remain_vol = vol - self.execution_strength
 
@@ -310,20 +318,14 @@ class Account:
     @property
     def is_insufficient_for_new_contract(self):
         # 현재가 기준 1계약도 더 체결 불가능한 상태 
-        # 위험한 상황 
         min_contract_margin = self.market_pt * self.initial_margin_rate * self.contract_unit
-        return self.balance < min_contract_margin
+        return self.balance - self.maintenance_margin < min_contract_margin
 
-    @property
-    def equity(self) -> float:
-        # 선물 계정의 올바른 Equity 정의
-        return self.available_balance + self.margin_deposit + self.unrealized_pnl
-    
     @property
     def balance(self) -> float:
         # 잔고 (미실현 수익 포함)
         return self.available_balance + self.unrealized_pnl
-    
+
     def __str__(self):
         """계좌 상태 출력"""     
         return (
@@ -335,7 +337,7 @@ class Account:
             f"💸  Transaction Costs  : {self.total_transaction_costs:,.0f} KRW\n"
             f"📉  Unrealized PnL     : {self.unrealized_pnl:,.0f} KRW\n"
             f"💵  Realized PnL       : {self.realized_pnl:,.0f} KRW\n"
-            f"💰  Total Equity       : {self.equity:,.0f} KRW\n"
+            f"💰  Total Balance       : {self.balance:,.0f} KRW\n"
             f"⚖️  Avg Entry Price    : {self.average_entry:.2f}\n"
             f"💼  Current Position   : {self.position_dict[self.current_position]} ({self.current_position})\n"
             f"📊  Execution Strength : {self.execution_strength}/{self.position_cap}\n"
