@@ -82,7 +82,8 @@ class Trainer:
         self.agent.model.train()
         result =  run_loop(env, self.agent, 
                             self.config.agent.batch_size, self.config.agent.n_steps, 
-                            is_training=True, device=self.device, callbacks=self.callbacks) 
+                            is_training=True, device=self.device, callbacks=self.callbacks, 
+                            multi_critics=self.config.run.multi_critics) 
 
         for cb in self.callbacks:
             cb.on_train_end(common_log)
@@ -107,7 +108,8 @@ class Trainer:
             with torch.no_grad():
                 result = run_loop(env, self.agent, 
                                 self.config.agent.batch_size, self.config.agent.n_steps, 
-                                is_training=False, device=self.device, callbacks=self.callbacks)            
+                                is_training=False, device=self.device, callbacks=self.callbacks,
+                                multi_critics=self.config.run.multi_critics)            
         
         # 검증 종료 
         for cb in self.callbacks:

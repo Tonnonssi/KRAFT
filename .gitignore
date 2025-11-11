@@ -3,3 +3,7 @@
 *kraft.egg-info
 *uv.lock
 *__pycache__
+*build/
+*.pytest_cache/
+.vscode/
+.DS_Store

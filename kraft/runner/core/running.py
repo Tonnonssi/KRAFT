@@ -56,10 +56,17 @@ def _run_episode_multi_critics(env, agent, n_steps, device, callbacks=None):
     """
     def weighted_reward(reward, alpha):
         """multi critics PPO 에이전트에서 사용하는 가중 보상 계산"""
-        reward_tensor = torch.tensor(reward, dtype=torch.float32)
-        alpha_tensor = torch.tensor(alpha, dtype=torch.float32)
-        weighted = torch.sum(reward_tensor * alpha_tensor).clone().detach().item()
-        return weighted
+        if isinstance(reward, torch.Tensor):
+            reward_tensor = reward.clone().detach().to(torch.float32)
+        else:
+            reward_tensor = torch.as_tensor(reward, dtype=torch.float32)
+
+        if isinstance(alpha, torch.Tensor):
+            alpha_tensor = alpha.clone().detach().to(torch.float32)
+        else:
+            alpha_tensor = torch.as_tensor(alpha, dtype=torch.float32)
+
+        return torch.sum(reward_tensor * alpha_tensor).item()
     
     done = False 
     state = env.reset()
