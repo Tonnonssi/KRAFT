@@ -84,12 +84,12 @@ class PPOAgent:
             encoded_action = action_dist.sample()              # 정책에 따라 행동 추출
             log_prob = action_dist.log_prob(encoded_action)    # 행동의 logit 값
 
-            decoded_action = self.decode_action(encoded_action.item())
+            decoded_action = self._decode_action(encoded_action.item())
             return decoded_action, log_prob.item()
         else:
             # determinstic opt. 
             encoded_action = torch.argmax(logits, dim=-1)
-            decoded_action = self.decode_action(encoded_action.item())
+            decoded_action = self._decode_action(encoded_action.item())
             return decoded_action, None
         
     def clip_loss_ftn(self, 
@@ -120,6 +120,29 @@ class PPOAgent:
         - reversed list로 delta -> gae를 계산한다. 
         - GAE를 사용하면 bias-variance trade-off를 조절할 수 있다.
         '''
+
+        rewards, dones, values, next_values = self._get_adantage_info(memory)
+        values, next_values = values.squeeze(), next_values.squeeze()   # [Batch Size, 1] -> [Batch Size]
+
+        # Generalize Advantage Estimate(GAE) calculation
+        # reversed list로 delta -> gae를 계산. 
+        advantage = []
+        gae = 0
+        for t in reversed(range(len(rewards))):
+            delta = rewards[t] + self.gamma * next_values[t] * (1 - dones[t]) - values[t]
+            gae = delta + self.gamma * self.gae_lam * (1 - dones[t]) * gae
+            advantage.insert(0, gae)
+
+        adv = torch.tensor(advantage, dtype=torch.float32).unsqueeze(1)
+
+        if normalize:
+            mean, std = adv.mean(), adv.std()
+            adv = (adv - mean) / (std + 1e-8)  # 분기 없이 안정적으로
+
+        return adv
+    
+    def _get_adantage_info(self, memory):
+        """advantage 계산에 필요한 정보들을 반환한다."""
         # 장기 
         # to.device() 뭐가 더 빠르냐 
         # set memory
@@ -135,38 +158,20 @@ class PPOAgent:
         n_ts_states = torch.cat(n_ts_states, dim=0)
         n_ag_states = torch.cat(n_ag_states, dim=0)
 
-        states = (ts_states, ag_states)
-        next_states = (n_ts_states, n_ag_states)
-        rewards = torch.cat(rewards).view(-1)
-        dones = torch.cat(dones).view(-1)
+        states, next_states = (ts_states, ag_states), (n_ts_states, n_ag_states)
+        
+        rewards = torch.cat(rewards, dim=0)
+        dones = torch.cat(dones, dim=0)
 
         # get values - next_values : GAE 계산을 위함 
         with torch.no_grad():
             _, values = self.model(states)
             _, next_values = self.model(next_states)
 
-        values = values.squeeze().detach()
-        next_values = next_values.squeeze().detach()
+        values = values.detach()
+        next_values = next_values.detach()
 
-        # Generalize Advantage Estimate(GAE) calculation
-        # reversed list로 delta -> gae를 계산. 
-        advantage = []
-        gae = 0
-        for t in reversed(range(len(rewards))):
-            delta = rewards[t] + self.gamma * next_values[t] * (1 - dones[t]) - values[t]
-            gae = delta + self.gamma * self.gae_lam * (1 - dones[t]) * gae
-            advantage.insert(0, gae)
-
-        adv = torch.tensor(advantage, dtype=torch.float32).unsqueeze(1)
-
-        if normalize:
-            # 어드벤티지 정규화 (필요한지 잘 모르겠어서 opt) 
-            if adv.std() < 1e-8:
-                adv = adv - adv.mean()
-            else:
-                adv = (adv - adv.mean()) / (adv.std() + 1e-8)
-
-        return adv
+        return rewards, dones, values, next_values
     
     def sample_memory(self, memory, advantage):
         """
@@ -181,23 +186,22 @@ class PPOAgent:
         n_ts_states, n_ag_states = zip(*next_states)
 
         # cat across batch dimension
-        ts_states = torch.cat(ts_states, dim=0).to(self.device)
-        ag_states = torch.cat(ag_states, dim=0).to(self.device)
-        n_ts_states = torch.cat(n_ts_states, dim=0).to(self.device)
-        n_ag_states = torch.cat(n_ag_states, dim=0).to(self.device)
+        ts_states           = torch.cat(ts_states, dim=0).to(self.device)
+        ag_states           = torch.cat(ag_states, dim=0).to(self.device)
+        n_ts_states         = torch.cat(n_ts_states, dim=0).to(self.device)
+        n_ag_states         = torch.cat(n_ag_states, dim=0).to(self.device)
 
-        states = (ts_states, ag_states)
-        next_states = (n_ts_states, n_ag_states)
+        states, next_states = (ts_states, ag_states), (n_ts_states, n_ag_states)
 
-        decoded_actions = torch.cat(decoded_actions)
-        rewards = torch.cat(rewards).to(self.device)
-        dones = torch.cat(dones).to(self.device)
-        old_log_probs = torch.cat(old_log_probs).unsqueeze(1).to(self.device)
-        masks = torch.cat(masks).to(self.device)
-        entry_masks = torch.cat(entry_masks).to(self.device)
-        entry_scores = torch.cat(entry_scores).to(self.device)
+        decoded_actions     = torch.cat(decoded_actions)
+        rewards             = torch.cat(rewards, dim=0).to(self.device)
+        dones               = torch.cat(dones).to(self.device)
+        old_log_probs       = torch.cat(old_log_probs).unsqueeze(1).to(self.device)
+        masks               = torch.cat(masks).to(self.device)
+        entry_masks         = torch.cat(entry_masks).to(self.device)
+        entry_scores        = torch.cat(entry_scores).to(self.device)
 
-        encoded_actions = self.encode_action(decoded_actions).to(self.device)
+        encoded_actions = self._encode_action(decoded_actions).to(self.device)
         return states, encoded_actions, rewards, next_states, dones, old_log_probs, advantages, masks, entry_masks, entry_scores
 
     def train(self, 
@@ -232,36 +236,10 @@ class PPOAgent:
 
             # entropy bonus 
             action_dist = Categorical(logits=current_logits)                        
-            current_log_probs = action_dist.log_prob(encoded_actions.squeeze()).unsqueeze(1)
+            current_log_probs = action_dist.log_prob(encoded_actions).unsqueeze(1)
 
             # KL Divergence 
-            # [1] 현재 롱 숏 방향 분포 
-            current_policy_logit = current_logits.exp()
-            entry_probs = current_policy_logit[entry_masks]
-
-            short_probs = entry_probs[:, :self.single_volume_cap].sum(dim=1)
-            long_probs = entry_probs[:, self.single_volume_cap:].sum(dim=1)
-
-            total_probs = torch.stack([short_probs, long_probs], dim=1)
-            sum_probs = total_probs.sum(dim=1, keepdim=True).clamp_min(1e-8)
-            current_entry_policy = total_probs / sum_probs
-
-            # [2] 상태별 트렌드 점수 s_t
-            s = entry_scores[entry_masks]
-            p_long = torch.sigmoid(self.kappa * s)
-            p_target = torch.stack([1-p_long, p_long], dim=1)
-
-            # [3] 극단치 방지를 위해 uniform prior와 섞음 
-            p_mix = self.beta * 0.5 + (1-self.beta) * p_target
-
-            # [4] trend가 확실하다면 규제를 약화 
-            w = torch.sigmoid(-self.regulation * torch.abs(s)).detach()
-
-            # [5] KL( 현재 정책 | 타깃 혼합 분포 )
-            policy_safe = current_entry_policy.clamp_min(1e-6)
-            p_mix_safe = p_mix.clamp_min(1e-6)
-            kl = (policy_safe * (policy_safe.log() - p_mix_safe.log())).sum(dim=1)
-            entry_reg = (w * kl).mean() 
+            entry_reg = self._get_entry_regulation(current_logits, entry_masks, entry_scores)
 
             # 3 elements of loss : value_loss, clip_loss, entropy bonus 
             with torch.no_grad():
@@ -283,6 +261,38 @@ class PPOAgent:
             self.optimizer.step()
 
         return losses / self.epoch
+    
+    def _get_entry_regulation(self, current_logits, entry_masks, entry_scores):
+        '''현재 롱 숏 방향 분포에 대한 규제를 계산한다.'''
+        # [1] 현재 롱 숏 방향 분포 
+        current_policy_logit = current_logits.exp()
+        entry_probs = current_policy_logit[entry_masks]
+
+        short_probs = entry_probs[:, :self.single_volume_cap].sum(dim=1)
+        long_probs = entry_probs[:, self.single_volume_cap:].sum(dim=1)
+
+        total_probs = torch.stack([short_probs, long_probs], dim=1)
+        sum_probs = total_probs.sum(dim=1, keepdim=True).clamp_min(1e-8)
+        current_entry_policy = total_probs / sum_probs
+
+        # [2] 상태별 트렌드 점수 s_t
+        s = entry_scores[entry_masks]
+        p_long = torch.sigmoid(self.kappa * s)
+        p_target = torch.stack([1-p_long, p_long], dim=1)
+
+        # [3] 극단치 방지를 위해 uniform prior와 섞음 
+        p_mix = self.beta * 0.5 + (1-self.beta) * p_target
+
+        # [4] trend가 확실하다면 규제를 약화 
+        w = torch.sigmoid(-self.regulation * torch.abs(s)).detach()
+
+        # [5] KL( 현재 정책 | 타깃 혼합 분포 )
+        policy_safe = current_entry_policy.clamp_min(1e-6)
+        p_mix_safe = p_mix.clamp_min(1e-6)
+        kl = (policy_safe * (policy_safe.log() - p_mix_safe.log())).sum(dim=1)
+        entry_reg = (w * kl).mean() 
+
+        return entry_reg
 
     def load_model(self, state_dict):
         """외부에서 파라미터 업데이트를 도와주는 매서드"""
@@ -292,11 +302,11 @@ class PPOAgent:
         """기본으로 있는 옵티마이저를 변경할 때 이용하는 매서드"""
         self.optimizer = new_optimizer(self.model.parameters(), lr=self.lr)
 
-    def decode_action(self, encoded_action):
+    def _decode_action(self, encoded_action):
         """신경망 출력(0~20)을 에이전트 행동(-10~10)으로 변환."""
         return self.action_space[encoded_action]
 
-    def encode_action(self, decoded_action):
+    def _encode_action(self, decoded_action):
         """에이전트 행동(-10~10)을 신경망 출력(0~20)으로 변환."""
         offset = -self.action_space[0]  # -(-10) = 10 
         return decoded_action + offset
