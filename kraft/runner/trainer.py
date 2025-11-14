@@ -102,18 +102,31 @@ class Trainer:
                 cb.on_valid_end(common_log)
             return []
 
+        # EarlyStopping 콜백에서 validation을 생략하도록 요청한 경우
+        if self.early_stop:
+            for cb in self.callbacks:
+                cb.on_valid_end(common_log)
+            self.early_stop = False
+            return []
+
         self.agent.load_model(state_dict)
         self.agent.model.eval()
-        while not self.early_stop:
-            with torch.no_grad():
-                result = run_loop(env, self.agent, 
-                                self.config.agent.batch_size, self.config.agent.n_steps, 
-                                is_training=False, device=self.device, callbacks=self.callbacks,
-                                multi_critics=self.config.run.multi_critics)            
-        
+        with torch.no_grad():
+            result = run_loop(
+                env,
+                self.agent,
+                self.config.agent.batch_size,
+                self.config.agent.n_steps,
+                is_training=False,
+                device=self.device,
+                callbacks=self.callbacks,
+                multi_critics=self.config.run.multi_critics,
+            )
+
         # 검증 종료 
         for cb in self.callbacks:
             cb.on_valid_end(common_log)
+        self.early_stop = False
 
         return result
 
