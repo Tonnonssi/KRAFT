@@ -128,7 +128,7 @@ class BaseEnvironment(ABC):
         self.episode_event.collect_information(step_events_list)
 
         # 4) 필요 시 강제 청산 (만기/파산 등)
-        if self.step_event in self.liquidation_status_list and self.current_point is not None:
+        if any(event == self.step_event for event in self.liquidation_status_list) and self.current_point is not None:
             liq_pnl, liq_cost = self._maybe_liquidate(self.current_point)
             net_pnl += liq_pnl
             cost += liq_cost
@@ -217,6 +217,7 @@ class BaseEnvironment(ABC):
         """기본으로 초기화되어야 하는 것"""
         self.account.reset()
         self.episode_event = Event()
+        self.step_event = self.episode_event.step_event
 
         self.since_entry = 0
         self.maintained = 0

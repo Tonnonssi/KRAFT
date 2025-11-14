@@ -39,8 +39,10 @@ class Event:
 
         elif isinstance(other, (list, set, tuple)):
             # 컬렉션이면, 활성 상태 중 하나라도 포함되면 True
-            active_set = {status for status, v in self.event_dict.items() if v > 0}
-            return not active_set.isdisjoint(other)
+            for status in other:
+                if status in self.event_dict and self.event_dict[status] > 0:
+                    return True
+            return False
 
         return NotImplemented
 
@@ -73,6 +75,9 @@ class Event:
         for status, count in self.step_event.event_dict.items():
             if count > 0:
                 self.event_dict[status] += count
+
+    def __str__(self):
+        return f"Event({self.event_dict})"
 
 class StepEvent(Event):
     """
