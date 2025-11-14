@@ -1,10 +1,26 @@
+from __future__ import annotations
+
 from .base import Callback
 import numpy as np
 import matplotlib.pyplot as plt
 from ..visualization import *
+from pathlib import Path
+import csv
+import json
 
 class VisualizationCallback(Callback):
     """시각화를 담당하는 콜백"""
+    def __init__(self):
+        self.csv_dir: Path | None = None
+        self.cum_realized_pnl = 0
+        self._reset_step_traker()
+        self._reset_epi_traker()
+
+    def set_trainer(self, trainer):
+        super().set_trainer(trainer)
+        self.csv_dir = Path(self.trainer.base_path) / "csv"
+        self.csv_dir.mkdir(parents=True, exist_ok=True)
+
     def on_interval_begin(self, logs=None):
         self.cum_realized_pnl = 0
 
@@ -15,16 +31,22 @@ class VisualizationCallback(Callback):
     def on_train_end(self, logs=None): 
         """3 종류의 에피소드 시각화 진행"""
         dataset_flag = logs['dataset_flag']
+        if not self.reward_list:
+            self.logging(f"[Skip] Visualization (train) | interval={dataset_flag} | no episodes recorded.")
+            return
 
-        _, ax = plt.subplots(nrows=4, ncols=1, figsize=(18, 12))
-        self.get_train_info(ax[0], logs)
-        plot_training_curves(ax[1], self.reward_list, self.loss_list)
-        plot_event_per_episodes(ax[2], self.event_list)
-        plot_histogram_with_stats(ax[3], self.pnl_ratio_list, title='"PnL Ratio Distribution"')
+        # _, ax = plt.subplots(nrows=4, ncols=1, figsize=(18, 12))
+        # self.get_train_info(ax[0], logs)
+        # plot_training_curves(ax[1], self.reward_list, self.loss_list)
+        # plot_event_per_episodes(ax[2], self.event_list)
+        # plot_histogram_with_stats(ax[3], self.pnl_ratio_list, title='"PnL Ratio Distribution"')
         
-        path = self._get_directory(f'TFI{dataset_flag-1}')
-        plt.savefig(path)
-        self.logging(f"✅ 시각화 저장 완료: {path}")
+        # path = self._get_directory(f'TFI{dataset_flag-1}')
+        # plt.savefig(path)
+        # plt.close()
+        # self.logging(f"✅ 시각화 저장 완료: {path}")
+        self._save_episode_csv(phase="train", dataset_flag=dataset_flag)
+        self._save_step_csv(phase="train", dataset_flag=dataset_flag)
 
     def on_valid_begin(self, logs=None): 
         self._reset_step_traker()
@@ -34,27 +56,34 @@ class VisualizationCallback(Callback):
         dataset_flag = logs['dataset_flag']
         model_type = logs['model_type']
 
+        if not self.timestep_list:
+            self.logging(f"[Skip] Visualization (valid) | interval={dataset_flag} | model={model_type} | no steps recorded.")
+            return
+
         long_lst, short_lst = self._split_long_short(self.entry_action_list)
 
-        fig, ax = plt.subplots(
-            nrows=8,
-            ncols=1,
-            figsize=(22, 18),
-            constrained_layout=True,
-            gridspec_kw={'height_ratios': [1.1, 2.0, 1.6, 1.3, 1.6, 1.8, 1.2, 1.2]}
-        )
-        self.get_valid_info(ax[0], logs)
-        plot_market_with_actions(ax[1], self.timestep_list, self.close_price_list, self.action_list, self.maintained_vol_list)
-        plot_both_pnl_ticks(ax[2], self.timestep_list, self.unrealized_pnl_list, self.net_realized_pnl_list)
-        plot_histogram_with_stats(ax[3], self.step_reward_list, title="Step Reward Distribution")
-        plot_event_per_episodes(ax[4], self.event_list)
-        plot_action_distribution_heatmap(ax[5], self.timestep_list, self.action_list)
-        plot_long_short(ax[6], long_lst, short_lst, title='Entry Action Distribution')
-        plot_realized_pnl(ax[7], self.timestep_list, self.cum_realized_pnl_list)
+        # fig, ax = plt.subplots(
+        #     nrows=8,
+        #     ncols=1,
+        #     figsize=(22, 18),
+        #     constrained_layout=True,
+        #     gridspec_kw={'height_ratios': [1.1, 2.0, 1.6, 1.3, 1.6, 1.8, 1.2, 1.2]}
+        # )
+        # self.get_valid_info(ax[0], logs)
+        # plot_market_with_actions(ax[1], self.timestep_list, self.close_price_list, self.action_list, self.maintained_vol_list)
+        # plot_both_pnl_ticks(ax[2], self.timestep_list, self.unrealized_pnl_list, self.net_realized_pnl_list)
+        # plot_histogram_with_stats(ax[3], self.step_reward_list, title="Step Reward Distribution")
+        # plot_event_per_episodes(ax[4], self.event_list)
+        # plot_action_distribution_heatmap(ax[5], self.timestep_list, self.action_list)
+        # plot_long_short(ax[6], long_lst, short_lst, title='Entry Action Distribution')
+        # plot_realized_pnl(ax[7], self.timestep_list, self.cum_realized_pnl_list)
 
-        path = self._get_directory(f'ValidI{dataset_flag}_{model_type}')
-        fig.savefig(path)
-        self.logging(f"✅ 시각화 저장 완료: {path}")
+        # path = self._get_directory(f'ValidI{dataset_flag}_{model_type}')
+        # fig.savefig(path)
+        # plt.close(fig)
+        # self.logging(f"✅ 시각화 저장 완료: {path}")
+        self._save_episode_csv(phase=f"valid_{model_type}", dataset_flag=dataset_flag)
+        self._save_step_csv(phase=f"valid_{model_type}", dataset_flag=dataset_flag)
 
 
     def on_episode_end(self, logs=None): 
@@ -221,3 +250,88 @@ class VisualizationCallback(Callback):
         self.liquidation_action_list = []
         self.step_reward_list = []
 
+    # ----- CSV Logging Helpers -----
+    def _ensure_csv_dir(self):
+        if self.csv_dir is None:
+            self.csv_dir = Path(self.trainer.base_path) / "csv"
+            self.csv_dir.mkdir(parents=True, exist_ok=True)
+
+    def _save_episode_csv(self, phase: str, dataset_flag: int):
+        if not self.reward_list:
+            return
+        self._ensure_csv_dir()
+        rows = []
+        for idx, (loss, reward, win, maintained, pnl_ratio, events) in enumerate(
+            zip(
+                self.loss_list,
+                self.reward_list,
+                self.winrate_list,
+                self.maintained_list,
+                self.pnl_ratio_list,
+                self.event_list,
+            )
+        ):
+            rows.append(
+                {
+                    "phase": phase,
+                    "dataset_flag": dataset_flag,
+                    "episode_idx": idx,
+                    "loss": loss,
+                    "reward": reward,
+                    "winrate": win,
+                    "maintained": maintained,
+                    "pnl_ratio": pnl_ratio,
+                    "event": json.dumps(events, ensure_ascii=False),
+                }
+            )
+        path = self.csv_dir / f"{phase}_interval{dataset_flag}_episodes.csv"
+        self._write_csv(path, rows)
+
+    def _save_step_csv(self, phase: str, dataset_flag: int):
+        if not self.timestep_list:
+            return
+        self._ensure_csv_dir()
+        rows = []
+        for idx, (ts, price, unreal, cum_real, net_real, maintained, action, entry, liq, reward) in enumerate(
+            zip(
+                self.timestep_list,
+                self.close_price_list,
+                self.unrealized_pnl_list,
+                self.cum_realized_pnl_list,
+                self.net_realized_pnl_list,
+                self.maintained_vol_list,
+                self.action_list,
+                self.entry_action_list,
+                self.liquidation_action_list,
+                self.step_reward_list,
+            )
+        ):
+            rows.append(
+                {
+                    "phase": phase,
+                    "dataset_flag": dataset_flag,
+                    "step_idx": idx,
+                    "timestep": str(ts),
+                    "close_price": price,
+                    "unrealized_pnl": unreal,
+                    "cum_realized_pnl": cum_real,
+                    "net_realized_pnl": net_real,
+                    "maintained_vol": maintained,
+                    "action": action,
+                    "entry_action": entry,
+                    "liquidation_action": liq,
+                    "step_reward": reward,
+                }
+            )
+        path = self.csv_dir / f"{phase}_interval{dataset_flag}_steps.csv"
+        self._write_csv(path, rows)
+
+    def _write_csv(self, path: Path, rows: list[dict]):
+        if not rows:
+            return
+        header = list(rows[0].keys())
+        with path.open("w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=header)
+            writer.writeheader()
+            writer.writerows(rows)
+        self.logging(f"📝 CSV 저장 완료: {path}")
