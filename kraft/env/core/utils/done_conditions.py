@@ -5,7 +5,11 @@ def is_day_changed(current_timestep, next_timestep):
     날짜를 기준으로 구분한다. 
     날이 달라지면 true 
     """
-    return current_timestep.date() != next_timestep.date()
+    try:
+        done = current_timestep.date() != next_timestep.date()
+    except AttributeError:  # 마지막 데이터라서 next_timestep이 없는 경우, 오류 방지 
+        done = False
+    return done
 
 def reached_end_of_dataset(dataset, current_timestep):
     """
