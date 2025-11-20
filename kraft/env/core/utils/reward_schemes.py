@@ -61,6 +61,8 @@ class RewardInfo:
         return len(self.__dict__.values())
 
 
+INITIAL_ACCOUNT_BALANCE = 30_000_000
+
 class RRPAReward:
     """RRPAReward (Risk Regret Profit Aware Reward)"""
     INIT_SEQ = [
@@ -92,7 +94,8 @@ class RRPAReward:
         realized_term = info.net_realized_pnl
         unrealized_term = info.current_unrealized_pnl - info.prev_unrealized_pnl
         # return self.log(realized_term) + self.log(unrealized_term)
-        return self.log(realized_term + unrealized_term) # balance base
+        # return realized_term + unrealized_term # balance base
+        return (realized_term + info.current_unrealized_pnl) / (INITIAL_ACCOUNT_BALANCE * 0.1)  # 10% 수익 기준 스케일링
 
     def _calculate_risk_reward(self, info: RewardInfo) -> float:
         """위험 컴포넌트(R_risk) 계산"""
@@ -102,7 +105,7 @@ class RRPAReward:
     def _calculate_regret_penalty(self, info: RewardInfo) -> float:
         """후회(Regret) 페널티 계산"""
         is_flat = (np.sign(info.current_position) == 0 and np.sign(info.prev_position) == 0)
-        return self.log(abs(info.point_delta)) if is_flat else 0.0
+        return (abs(info.point_delta)*10 / (INITIAL_ACCOUNT_BALANCE * 0.01)) if is_flat else 0.0
 
     def _apply_event_bonus_penalty(self, base_reward: float, event, reward_info) -> float:
         """이벤트에 따른 보너스 및 페널티 적용"""
@@ -152,4 +155,4 @@ class MultiRRPAReward(RRPAReward):
         r_risk = self._calculate_risk_reward(reward_info)
         r_regret = - self._calculate_regret_penalty(reward_info)
 
-        return self.clipping(r_profit), self.clipping(r_risk), self.clipping(r_regret)
+        return r_profit, r_risk, r_regret
