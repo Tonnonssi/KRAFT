@@ -136,3 +136,20 @@ class RRPAReward:
         final_reward = self._apply_event_bonus_penalty(base_reward, event, reward_info)
         
         return np.clip(final_reward, -2,2)
+    
+
+class MultiRRPAReward(RRPAReward):
+    """RRPAReward (Risk Regret Profit Aware Reward) + Multi-Critics 버전"""
+    def clipping(self, value: float, min_value: float = -1.0, max_value: float = 1.0) -> float:
+        return round(max(min(value, max_value), min_value), 2)
+
+    def __call__(self, reward_info: RewardInfo, event: str) -> tuple[float, float, float]:
+        """
+        주어진 데이터(info)와 이벤트(event)를 바탕으로 최종 보상을 계산.
+        클래스 인스턴스를 함수처럼 호출할 수 있게 함.
+        """
+        r_profit = self._calculate_profit_reward(reward_info)
+        r_risk = self._calculate_risk_reward(reward_info)
+        r_regret = - self._calculate_regret_penalty(reward_info)
+
+        return self.clipping(r_profit), self.clipping(r_risk), self.clipping(r_regret)

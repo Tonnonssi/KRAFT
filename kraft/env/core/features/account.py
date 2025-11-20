@@ -183,7 +183,7 @@ class Account:
 
             # 실현 손익
             net_pnl = pnl - cost
-            self.realized_pnl += net_pnl
+            self.realized_pnl += int(net_pnl)
 
             # 계좌 변동
             self.available_balance += settled_initial_margin + net_pnl
@@ -214,10 +214,10 @@ class Account:
         self.maintenance_margin = 0
 
         # 실현 손익
-        self.realized_pnl += net_pnl
+        self.realized_pnl += int(net_pnl)
 
         # 계좌 변동
-        self._return_margin_deposit(net_pnl)
+        self._return_margin_deposit(int(net_pnl))
         self.total_transaction_costs += cost
 
         # 정보 업데이트
@@ -239,10 +239,10 @@ class Account:
             self.available_balance += daily_settle
 
             # 직전 스텝 미실현 수익 저장
-            self.prev_unrealized_pnl = self.unrealized_pnl
+            self.prev_unrealized_pnl = int(self.unrealized_pnl)
 
             # 미실현 손익 -> 실현 손익 전환
-            self.realized_pnl += daily_settle
+            self.realized_pnl += int(daily_settle)
             self.unrealized_pnl = 0
 
     def _update_account(self, market_pt):

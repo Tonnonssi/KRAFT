@@ -4,8 +4,8 @@ import numpy as np
 
 from . import resolve_class
 from .search_param import search_params
-from ...model import MultiStatePV, AgentStateEncoder, BaseFusion
-from ...env.core.utils.reward_schemes import RRPAReward
+from ...model import MultiStatePV, MultiCritics, AgentStateEncoder, BaseFusion
+from ...env.core.utils.reward_schemes import RRPAReward, MultiRRPAReward
 from ..core.callback import *
 
 def build_agent(cfg):
@@ -24,9 +24,11 @@ def build_model(cfg):
     params = search_params(cfg, ts_encoder_cls.INIT_SEQ)
     ts_encoder = ts_encoder_cls(*params)
 
-    multi_state_params = search_params(cfg, MultiStatePV.INIT_SEQ)
-    
-    return MultiStatePV(
+    model_structure = MultiCritics if cfg.run.multi_critics else MultiStatePV
+
+    multi_state_params = search_params(cfg, model_structure.INIT_SEQ)
+
+    return model_structure(
         ts_encoder,
         AgentStateEncoder,
         BaseFusion,
@@ -36,7 +38,11 @@ def build_model(cfg):
 def build_reward_ftn(cfg):
     """reward ftn 인스턴스 생성"""
     reward_params = search_params(cfg, RRPAReward.INIT_SEQ)
-    return RRPAReward(*reward_params)
+    
+    if cfg.run.multi_critics:
+        return MultiRRPAReward(*reward_params)
+    else:
+        return RRPAReward(*reward_params)
 
 
 def build_callbacks(cfg):

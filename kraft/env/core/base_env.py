@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 import pandas as pd
 import numpy as np
+import torch
+from torch.distributions.dirichlet import Dirichlet 
 from typing import Dict, List, Tuple, Optional, Any
 
 from .features.dataset import FuturesDataset
@@ -34,6 +36,7 @@ class BaseEnvironment(ABC):
                  scaler=None,
                  target_columns=None,
                  pnl_threshold=0.05,
+                 alpha_parameters=[5.0,3.0,1.0],
                  **kwargs):     # randomsampling env 때문에 필요  
         
         # ====== Main DATA ===============================
@@ -51,6 +54,8 @@ class BaseEnvironment(ABC):
         self.State = State
         self.AgentState = AgentState
         self.current_state = None 
+
+        self.alpha_parameters = alpha_parameters  # multi-critics PPO에서 사용하는 α 파라미터
 
         # ====== Position & Duration =====================
         
@@ -103,7 +108,7 @@ class BaseEnvironment(ABC):
         self.data_iterator = iter(self.dataset)
         self.dataset_df = self.dataset.cleaned_df
 
-    def step(self, decoded_action: int) -> Tuple[Any, float, bool, Any]:
+    def step(self, decoded_action: int) -> Tuple[Any, Any, bool, Any]:
         """
         action을 적용해 S_t -> S_{t+1} 전이.
         Returns:
@@ -123,7 +128,7 @@ class BaseEnvironment(ABC):
         self.episode_event.collect_information(step_events_list)
 
         # 4) 필요 시 강제 청산 (만기/파산 등)
-        if self.step_event in self.liquidation_status_list and self.current_point is not None:
+        if any(event in self.step_event for event in self.liquidation_status_list) and self.current_point is not None:
             liq_pnl, liq_cost = self._maybe_liquidate(self.current_point)
             net_pnl += liq_pnl
             cost += liq_cost
@@ -179,7 +184,7 @@ class BaseEnvironment(ABC):
         """다음 관찰(State 객체) 구성."""
         return State(timeseries_state=next_ts_state, agent_state=self.agent_state)
 
-    def _compute_reward(self, event:StepEvent) -> float:
+    def _compute_reward(self, event:StepEvent):
         """RewardInfo를 구성해 보상 계산."""
         rinfo = RewardInfo(
             net_realized_pnl=self.account.net_realized_pnl,
@@ -192,7 +197,7 @@ class BaseEnvironment(ABC):
             point_delta=self.point_delta,
             execution_strength=self.account.execution_strength,
         )
-        return float(self.get_reward(rinfo, event=event))
+        return self.get_reward(rinfo, event=event)      # single critic in R, multi critics in R^3
 
     @abstractmethod 
     def reset(self) -> Tuple:
@@ -212,6 +217,7 @@ class BaseEnvironment(ABC):
         """기본으로 초기화되어야 하는 것"""
         self.account.reset()
         self.episode_event = Event()
+        self.step_event = self.episode_event.step_event
 
         self.since_entry = 0
         self.maintained = 0
@@ -254,6 +260,13 @@ class BaseEnvironment(ABC):
         net_pnl, cost = self.account.step(reversed_execution, current_price, self.current_timestep) 
 
         return net_pnl, cost
+    
+    def reset_alpha(self):
+        """
+        Multi-Critics PPO에서 사용하는 α 초기화, single critic에서는 사용하지 않는다.
+        한 에피소드 동안 고정된다. 
+        """
+        self.alpha = Dirichlet(torch.tensor(self.alpha_parameters, dtype=torch.float32)).sample().detach()
 
     @property
     def agent_state(self) -> AgentState:
