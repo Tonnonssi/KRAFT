@@ -128,7 +128,7 @@ class BaseEnvironment(ABC):
         self.episode_event.collect_information(step_events_list)
 
         # 4) 필요 시 강제 청산 (만기/파산 등)
-        if any(event == self.step_event for event in self.liquidation_status_list) and self.current_point is not None:
+        if any(event in self.step_event for event in self.liquidation_status_list) and self.current_point is not None:
             liq_pnl, liq_cost = self._maybe_liquidate(self.current_point)
             net_pnl += liq_pnl
             cost += liq_cost
