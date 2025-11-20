@@ -24,14 +24,14 @@ class AgentState:
         """
         [-1,1] 사이로 스케일링 
         ------------------------------
-        current_position: int       # 현재 포지션 (-1,0,+1)
-        execution_strength: int     # 체결 강도 (0~10)
-        n_days_before_ma: int       # 만기일까지 남은 날 (0~30)
-        realized_pnl: float         # 실현 손익 (KRW)
-        unrealized_pnl: float       # 미실현 손익 (KRW)
-        available_balance: float    # 가용 잔고 (KRW)
-        cost: float                 # 비용 (KRW)
-        market_regime: int          # 단기적 시장 국면(-1,0,+1)
+        current_position: int       # 현재 포지션 (-1,0,+1) 유지 
+        execution_strength: int     # 체결 강도 (0~10) max 값으로 스케일링
+        n_days_before_ma: int       # 만기일까지 남은 날 (0~30) 30일 기준으로 스케일링
+        realized_pnl: float         # 실현 손익 (KRW) 10% 손익을 기준으로 스케일링 
+        unrealized_pnl: float       # 미실현 손익 (KRW) 5% 손익을 기준으로 스케일링
+        available_balance: float    # 가용 잔고 (KRW) 50% 잔고를 기준으로 스케일링
+        cost: float                 # 비용 (KRW) 2% 비용을 기준으로 스케일링
+        market_regime: int          # 단기적 시장 국면(-1,0,+1) 유지
         """
         return [
             self.current_position,  
