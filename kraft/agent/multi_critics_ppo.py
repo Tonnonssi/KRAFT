@@ -70,8 +70,8 @@ class MultiCriticsPPOAgent(PPOAgent):
         gae = torch.zeros((rewards.size(1),), dtype=torch.float32).to(self.device)  # [3,]
 
         for t in reversed(range(len(rewards))):
-            delta = rewards[t] + self.gamma * next_values[t] * int(1 - dones[t]) - values[t]
-            gae = delta + self.gamma * self.gae_lam * int(1 - dones[t]) * gae
+            delta = rewards[t] + self.gamma * next_values[t] * (1.0 - dones[t]) - values[t]
+            gae = delta + self.gamma * self.gae_lam * (1.0 - dones[t]) * gae
             advantage[t] = gae
 
         adv = self._get_aggregated_advantages(advantage, alpha)

@@ -129,8 +129,8 @@ class PPOAgent:
         advantage = []
         gae = 0
         for t in reversed(range(len(rewards))):
-            delta = rewards[t] + self.gamma * next_values[t] * (1 - dones[t]) - values[t]
-            gae = delta + self.gamma * self.gae_lam * (1 - dones[t]) * gae
+            delta = rewards[t] + self.gamma * next_values[t] * (1.0 - dones[t]) - values[t]
+            gae = delta + self.gamma * self.gae_lam * (1.0 - dones[t]) * gae
             advantage.insert(0, gae)
 
         adv = torch.tensor(advantage, dtype=torch.float32).unsqueeze(1)
