@@ -230,20 +230,34 @@ class Account:
         self.available_balance += self.margin_deposit + net_pnl
         self.margin_deposit = 0
 
-    def daily_settlement(self, close_pt):
-        '''
-        하루 장이 마감된 후 daily settlement 이루어짐 
-        '''
-        if self.execution_strength != 0:
-            daily_settle = self._get_pnl(close_pt, self.execution_strength)
-            self.available_balance += daily_settle
+    def daily_settlement(self, close_pt:float):
+        """
+        하루 장 마감 후 일일 정산:
+        - 미실현 손익을 실현 손익/가용잔고로 이전
+        - 모든 계약의 기준가를 정산가로 리셋 (mark-to-market)
+        """
+        if self.execution_strength == 0:
+            return
 
-            # 직전 스텝 미실현 수익 저장
-            self.prev_unrealized_pnl = int(self.unrealized_pnl)
+        # 1) 현재 진입가 기준 전체 미실현 손익 계산
+        daily_settle = self._get_pnl(close_pt, self.execution_strength)
 
-            # 미실현 손익 -> 실현 손익 전환
-            self.realized_pnl += int(daily_settle)
-            self.unrealized_pnl = 0
+        # 2) 계좌에 반영 (variation margin)
+        self.available_balance += daily_settle
+
+        # 직전 미실현 손익 저장 (reward용이면 유지)
+        self.prev_unrealized_pnl = int(self.unrealized_pnl)
+
+        # 3) 미실현 → 실현 전환
+        self.realized_pnl += int(daily_settle)
+        self.unrealized_pnl = 0
+
+        # 4) **포지션 기준가를 정산가로 리셋**
+        self.open_interest_list = [close_pt for _ in range(self.execution_strength)]
+        self.current_name_value = close_pt * self.execution_strength
+
+        # 5) 유지증거금/평균 진입가 등 정산가 기준으로 다시 계산
+        self._update_account(close_pt)
 
     def _update_account(self, market_pt):
         '''
