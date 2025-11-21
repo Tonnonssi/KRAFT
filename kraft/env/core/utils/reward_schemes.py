@@ -4,7 +4,7 @@ import numpy as np
 from .._specification import CONTRACT_UNIT
 
 class DifferentialSharpeRatio:
-    def __init__(self, span=300, initial_returns=None, epsilon=1e-8):
+    def __init__(self, span=60, initial_returns=None, epsilon=1e-8):
         if span < 1:
             raise ValueError("Span must be a positive integer.")
         
