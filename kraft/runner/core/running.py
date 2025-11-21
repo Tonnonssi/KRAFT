@@ -204,7 +204,7 @@ def get_extra_memory(env, decoded_action):
 
 def get_step_log(env, decoded_action, step_reward, idx):
     """step 단위 Callback에 필요한 파라미터들"""
-    is_liquidation = (env.account.prev_position != env.account.current_position) & ~env.is_entry & (env.account.current_position != 0)
+    is_liquidation = (env.account.prev_position != env.account.current_position) & ~env.is_entry
     entry_action = decoded_action if env.is_entry else None
     liquidation_action = decoded_action if is_liquidation else None
 

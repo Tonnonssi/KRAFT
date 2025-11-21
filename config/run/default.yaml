@@ -1,8 +1,8 @@
-fname: ProfitnRiskClipped_marketRegimeMasked01
+fname: new_daily_settlement
 agent_class: MultiCriticsPPOAgent
 env: EpisodicStreamEnv
 timeseries_network: CTTS
-multi_critics: False
+multi_critics: True
 train_epoch: 10
 print_step_log_in: 100
 print_episode_log_in: 1

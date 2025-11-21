@@ -134,7 +134,7 @@ class BaseEnvironment(ABC):
             cost += liq_cost
 
         # 5) 일자 변경 시 일일 정산
-        if is_day_changed(self.account.prev_timestep, self.current_timestep) and self.current_point is not None:
+        if is_day_changed(self.next_timestep, self.current_timestep) and self.current_point is not None:
             self._maybe_daily_settlement(self.current_point)
 
         # 6) 다음 상태 생성
