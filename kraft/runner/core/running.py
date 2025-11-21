@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 
-def run_episode(env, agent, n_steps, device, callbacks=None, multi_critics=False):
+def run_episode(env, agent, n_steps, device, callbacks=None, multi_critics=False, stochastic=True):
     """
     하나의 에피소드를 실행한다. 
     [n_steps]이란? 
@@ -12,11 +12,11 @@ def run_episode(env, agent, n_steps, device, callbacks=None, multi_critics=False
     
     """
     if multi_critics: 
-        return _run_episode_multi_critics(env, agent, n_steps, device, callbacks)
+        return _run_episode_multi_critics(env, agent, n_steps, device, callbacks, stochastic=stochastic)
     else:
-        return _run_episode_single_critic(env, agent, n_steps, device, callbacks)
+        return _run_episode_single_critic(env, agent, n_steps, device, callbacks, stochastic=stochastic)
 
-def _run_episode_single_critic(env, agent, n_steps, device, callbacks=None):
+def _run_episode_single_critic(env, agent, n_steps, device, callbacks=None, stochastic=True):
     """single critic PPO 에이전트인 경우"""
     done = False 
     state = env.reset()
@@ -30,7 +30,7 @@ def _run_episode_single_critic(env, agent, n_steps, device, callbacks=None):
         if done:
             break 
 
-        decoded_action, log_prob = agent.get_action(state, mask, stochastic=True)
+        decoded_action, log_prob = agent.get_action(state, mask, stochastic=stochastic)
         next_state, reward, done, mask = env.step(decoded_action)
 
         next_state = get_trainable_state(next_state, device)
@@ -50,7 +50,7 @@ def _run_episode_single_critic(env, agent, n_steps, device, callbacks=None):
 
     return epi_memory, epi_reward, env.episode_event
     
-def _run_episode_multi_critics(env, agent, n_steps, device, callbacks=None):
+def _run_episode_multi_critics(env, agent, n_steps, device, callbacks=None, stochastic=True):
     """
     multi critics PPO 에이전트인 경우
     """
@@ -86,7 +86,7 @@ def _run_episode_multi_critics(env, agent, n_steps, device, callbacks=None):
         if done:
             break 
 
-        decoded_action, log_prob = agent.get_action(state, mask, stochastic=True)
+        decoded_action, log_prob = agent.get_action(state, mask, stochastic=stochastic)
         next_state, reward, done, mask = env.step(decoded_action)
 
         next_state = get_trainable_state(next_state, device)
@@ -126,7 +126,7 @@ def run_loop(env, agent, batch_size, n_steps, is_training: bool, device, callbac
     while not env.terminated:
         # 1. 에피소드 실행 (공통)
         # is_training 플래그를 전달하여 에이전트가 탐험(train) 또는 결정적 행동(valid/test)을 하도록 제어할 수 있음
-        epi_memory, epi_reward, episode_event = run_episode(env, agent, n_steps, device, callbacks, multi_critics)
+        epi_memory, epi_reward, episode_event = run_episode(env, agent, n_steps, device, callbacks, multi_critics, is_training)
         _episode_cum_reward += epi_reward
 
         # 2. 학습 로직 (is_training=True일 때만 실행)

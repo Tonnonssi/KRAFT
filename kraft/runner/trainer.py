@@ -120,7 +120,7 @@ class Trainer:
                 is_training=False,
                 device=self.device,
                 callbacks=self.callbacks,
-                multi_critics=self.config.run.multi_critics,
+                multi_critics=self.config.run.multi_critics
             )
 
         # 검증 종료 
