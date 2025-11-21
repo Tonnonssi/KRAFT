@@ -1,4 +1,4 @@
-fname: new_daily_settlement
+fname: new_daily_settlement_without_kl
 agent_class: MultiCriticsPPOAgent
 env: EpisodicStreamEnv
 timeseries_network: CTTS
