@@ -78,7 +78,6 @@ class Account:
         self.prev_position = self.current_position
         self.prev_unrealized_pnl = self.unrealized_pnl
         self.prev_realized_pnl = self.realized_pnl
-        self.prev_balance = self.available_balance
 
         # 초기화 
         self.net_realized_pnl = 0
@@ -250,6 +249,7 @@ class Account:
 
         # 3) 미실현 → 실현 전환
         self.realized_pnl += int(daily_settle)
+        self.net_realized_pnl = int(daily_settle)
         self.unrealized_pnl = 0
 
         # 4) **포지션 기준가를 정산가로 리셋**

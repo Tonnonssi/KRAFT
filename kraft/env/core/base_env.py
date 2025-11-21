@@ -135,7 +135,7 @@ class BaseEnvironment(ABC):
 
         # 5) 일자 변경 시 일일 정산
         if is_day_changed(self.next_timestep, self.current_timestep) and self.current_point is not None:
-            self._maybe_daily_settlement(self.current_point)
+            self.account.daily_settlement(self.current_point)
 
         # 6) 다음 상태 생성
         next_state_obj = self._build_next_state(next_ts_state)
@@ -175,10 +175,6 @@ class BaseEnvironment(ABC):
     def _maybe_liquidate(self, current_price: float) -> Tuple[float, float]:
         """필요 시 전량 청산."""
         return self.force_liquidate_all_positions(current_price)
-
-    def _maybe_daily_settlement(self, current_price: float) -> None:
-        """일자 변경 시 미실현 → 실현으로 일일 정산."""
-        self.account.daily_settlement(current_price)
 
     def _build_next_state(self, next_ts_state: Any) -> State:
         """다음 관찰(State 객체) 구성."""
