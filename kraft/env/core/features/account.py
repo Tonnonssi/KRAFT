@@ -22,7 +22,7 @@ class Account:
         self.position_cap = position_cap         # 최대 계약 수 상한
         
         # 수수료, 슬리피지
-        self.slippage_factor = slippage_factor
+        self.slippage_factor = slippage_factor   # 슬리피지 계수 (비율)
 
         ########### variable value ###########
         self.reset()
@@ -64,6 +64,7 @@ class Account:
         self.prev_balance = 0                   # 이전 자산 
         self.prev_position = 0                  # 이전 포지션, 표기 방식은 위와 동일 
         self.prev_timestep = None               # 이전 시간 
+        self.prev_execution_strength = 0        # 이전 체결 강도
 
         self.settled = False                    # 계약 청산 여부
         self.concluded = False                  # 계약 체결 여부
@@ -76,6 +77,7 @@ class Account:
         '''
         # 이전 정보: 포지션, 미실현 손익 저장 
         self.prev_position = self.current_position
+        self.prev_execution_strength = self.execution_strength
         self.prev_unrealized_pnl = self.unrealized_pnl
         self.prev_realized_pnl = self.realized_pnl
 
@@ -91,35 +93,34 @@ class Account:
         # 현재 action 정보
         self.market_pt = market_pt
 
-        position, contract_vol = self.get_position_n_vol(decoded_action)
+        position, contract_vol = self.divide_position_n_vol(decoded_action)
         position_diff = position * self.prev_position
 
         if decoded_action != 0:
             self.total_trades += 1
-            cost = self._get_cost(decoded_action, market_pt)
 
             # 새로운 계약 체결: 현재 보유 계약이 없는 경우 / 현재 포지션과 같은 포지션을 취하는 경우
             # 사실 position_diff >= 0가 모든 케이스를 포함하지만, 혹시나 모르니 명확하게 체결 강도를 살려둠 
-            if (self.execution_strength == 0) or (position_diff >= 0):
-                self._conclude_contract(contract_vol, position, market_pt)
+            if (self.prev_execution_strength == 0) or (position_diff >= 0):
+                cost = self._conclude_contract(contract_vol, position, market_pt)
 
             # 계약 청산: 현재 포지션과 반대 포지션을 취하는 경우
             elif position_diff < 0:
-                realized_net_pnl = self._settle_contract(contract_vol, position, market_pt)
+                realized_net_pnl, cost = self._settle_contract(contract_vol, position, market_pt)
         
         # timestep 업데이트
         self.current_timestep = next_timestep
-        self.net_realized_pnl = self.realized_pnl - self.prev_realized_pnl
 
         # 정보 업데이트
         self._update_account(market_pt)
 
         # (추가) 실현 손익 비율 업데이트
+        self.net_realized_pnl = self.realized_pnl - self.prev_realized_pnl
         self.realized_pnl_ratio = self.realized_pnl / self.initial_budget
 
         return realized_net_pnl, cost
 
-    def _conclude_contract(self, vol, position, market_pt):
+    def _conclude_contract(self, vol, position, market_pt) -> float:
         '''
         새로운 계약 체결 함수
         현재 보유 계약이 없는 경우 / 현재 포지션과 같은 포지션을 취하는 경우에 call
@@ -142,30 +143,39 @@ class Account:
         self.total_transaction_costs += cost
 
         # 계좌 변동
-        self.available_balance -= initial_margin + cost
-        self.margin_deposit += initial_margin
-        self.realized_pnl -= cost
+        self.available_balance -= initial_margin + cost # 가용 잔고에서 초기 증거금과 수수료를 제함 
+        self.margin_deposit += initial_margin           # 마진콜 대비 증거금 예치 
+        self.realized_pnl -= cost                       # 수수료를 실현 손익에 반영 
 
-    def _settle_contract(self, vol, position, market_pt, get_pnl=True):
+        return cost
+
+    def _settle_contract(self, vol, position, market_pt):
         '''
         계약 청산 함수
         - 항상 반대 계약 체결 시 Call
         - 현재 열려있는 계약에 대해 vol만큼 청산
         - 만약 열려있는 계약 수보다 반대 포지션을 더 많이 체결한 경우 나머지에 대해 새로운 계약 추가
         '''
-        self.settled = True                    
+        self.settled = True   
+        net_pnl = 0 
+        cost = 0                
 
-        if vol >= self.execution_strength:  # 기존 체결 강도보다 많은 반대 계약 체결 시
+        # 기존 체결 강도보다 많은 반대 계약 체결 시,
+        if vol >= self.execution_strength:  
             remain_vol = vol - self.execution_strength
 
             # 전체 계약 청산
-            net_pnl, _ = self._settle_total_contract(market_pt)
+            net_pnl, _cost = self._settle_total_contract(market_pt)
+            cost += _cost
 
             if remain_vol > 0:
                 # 남은 포지션에 대해 새로운 계약 체결
-                self._conclude_contract(remain_vol, position, market_pt)
+                _cost = self._conclude_contract(remain_vol, position, market_pt)
+                cost += _cost
+                net_pnl -= _cost  # 순 실현 손익에서 수수료 차감
 
-        else:   # 일부 청산
+        else:   
+            # 일부 청산
             settled_contract = self.open_interest_list[:vol]
             settled_value = sum(np.abs(settled_contract))
             pnl = self._get_pnl(market_pt, vol) 
@@ -182,15 +192,13 @@ class Account:
 
             # 실현 손익
             net_pnl = pnl - cost
-            self.realized_pnl += int(net_pnl)
+            self.realized_pnl += net_pnl
 
             # 계좌 변동
             self.available_balance += settled_initial_margin + net_pnl
             self.margin_deposit -= settled_initial_margin
-
-        if get_pnl:
-            return net_pnl
         
+        return round(net_pnl,1), cost
 
     def _settle_total_contract(self, market_pt):
         '''
@@ -222,7 +230,7 @@ class Account:
         # 정보 업데이트
         self._update_account(market_pt)
 
-        return net_pnl, cost
+        return round(net_pnl,1), cost
         
     def _return_margin_deposit(self, net_pnl):
         """전체 증거금을 반환한다."""
@@ -245,7 +253,7 @@ class Account:
         self.available_balance += daily_settle
 
         # 직전 미실현 손익 저장 (reward용이면 유지)
-        self.prev_unrealized_pnl = int(self.unrealized_pnl)
+        self.prev_unrealized_pnl = self.unrealized_pnl
 
         # 3) 미실현 → 실현 전환
         self.realized_pnl += int(daily_settle)
@@ -280,7 +288,7 @@ class Account:
         '''
         entries = np.array(self.open_interest_list[:vol])
         pnl_value = np.sum((market_pt - entries)) * self.current_position 
-        return pnl_value * self.contract_unit
+        return round(pnl_value * self.contract_unit, 1)
 
     def _calculate_transaction_cost(self, action: int, market_pt) -> float:
         '''
@@ -291,7 +299,7 @@ class Account:
             return 0.0
         else:
             trade_value = abs(action) * market_pt * self.transaction_cost_rate
-            return trade_value  * self.contract_unit 
+            return round(trade_value  * self.contract_unit, 1)
 
     def _calculate_slippage(self, action: int, market_pt) -> float:
         '''
@@ -302,7 +310,7 @@ class Account:
             return 0.0
         else:
             slippage_cost_value = abs(action) * market_pt * self.slippage_factor
-            return slippage_cost_value * self.contract_unit
+            return round(slippage_cost_value * self.contract_unit, 1)
 
     def _get_cost(self, action: int, market_pt) -> float:
         '''
@@ -312,7 +320,7 @@ class Account:
         cost = self._calculate_transaction_cost(action, market_pt) + self._calculate_slippage(action, market_pt)
         return cost
     
-    def get_position_n_vol(self, action):
+    def divide_position_n_vol(self, action):
         """
         행동의 포지션과 계약 수를 분리해 반환 
         """
