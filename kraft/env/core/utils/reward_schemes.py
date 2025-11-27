@@ -95,7 +95,7 @@ class RRPAReward:
         realized_term = info.net_realized_pnl
         unrealized_term = info.current_unrealized_pnl - info.prev_unrealized_pnl
         # return self.log(realized_term) + self.log(unrealized_term)
-        return (realized_term + unrealized_term) / (INITIAL_ACCOUNT_BALANCE * 0.005) * 10 # balance base
+        return (realized_term + unrealized_term) / (INITIAL_ACCOUNT_BALANCE * 0.005) # balance base
         # return (realized_term + info.current_unrealized_pnl) / (INITIAL_ACCOUNT_BALANCE * 0.005)  # 0.5% 수익 기준 스케일링
 
     def _calculate_risk_reward(self, info: RewardInfo) -> float:
@@ -105,7 +105,7 @@ class RRPAReward:
 
     def _calculate_regret_penalty(self, info: RewardInfo) -> float:
         """후회(Regret) 페널티 계산"""
-        regret_unit =  CONTRACT_UNIT / (INITIAL_ACCOUNT_BALANCE * 0.005) * 10 
+        regret_unit =  CONTRACT_UNIT / (INITIAL_ACCOUNT_BALANCE * 0.05) 
 
         # 1. 포지션을 잡지 않고 시장이 움직였을 때의 후회 반영
         if info.current_position == 0 and info.prev_position == 0:
