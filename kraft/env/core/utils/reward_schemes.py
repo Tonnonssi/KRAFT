@@ -57,10 +57,10 @@ class RewardInfo:
     current_position: int           # 후회 항목에 이용 
     point_delta: float              # 후회 항목에 이용 
     execution_strength: int         # 후회 항목에 이용 
+    prev_execution_strength: int    # 후회 항목에 이용 
 
     def __len__(self):
         return len(self.__dict__.values())
-
 
 INITIAL_ACCOUNT_BALANCE = 30_000_000
 
@@ -95,20 +95,28 @@ class RRPAReward:
         realized_term = info.net_realized_pnl
         unrealized_term = info.current_unrealized_pnl - info.prev_unrealized_pnl
         # return self.log(realized_term) + self.log(unrealized_term)
-        raw = (realized_term + unrealized_term) / (INITIAL_ACCOUNT_BALANCE * 0.005) * 10 # balance base
-        return np.clip(raw, -2.0, 2.0)
+        return (realized_term + unrealized_term) / (INITIAL_ACCOUNT_BALANCE * 0.005) * 10 # balance base
         # return (realized_term + info.current_unrealized_pnl) / (INITIAL_ACCOUNT_BALANCE * 0.005)  # 0.5% 수익 기준 스케일링
 
     def _calculate_risk_reward(self, info: RewardInfo) -> float:
         """위험 컴포넌트(R_risk) 계산"""
         portfolio_value_change = self.log(info.current_balance) - self.log(info.prev_balance)
-        return np.clip(self.DSR(portfolio_value_change) / 2, -1, 1)
+        return np.clip(self.DSR(portfolio_value_change), -2, 2)
 
     def _calculate_regret_penalty(self, info: RewardInfo) -> float:
         """후회(Regret) 페널티 계산"""
-        # 포지션을 잡지 않고 시장이 크게 움직였을 때의 후회 반영
+        regret_unit =  CONTRACT_UNIT / (INITIAL_ACCOUNT_BALANCE * 0.005) * 10 
+
+        # 1. 포지션을 잡지 않고 시장이 움직였을 때의 후회 반영
         if info.current_position == 0 and info.prev_position == 0:
-            return abs(info.point_delta) * CONTRACT_UNIT / (INITIAL_ACCOUNT_BALANCE * 0.005) * 10 
+            return abs(info.point_delta) * regret_unit
+        
+        # 2. 포지션을 유지할 때 손해보는 건데 유지 중.... 
+        elif info.prev_position != 0 and info.current_position == info.prev_position:
+            if np.sign(info.prev_position * info.point_delta) < 0:
+                return abs(info.point_delta) * regret_unit 
+            return 0.0
+        # 3. 기타 상황에서는 후회 없음
         else:
             return 0.0
 

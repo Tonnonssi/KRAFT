@@ -1,4 +1,4 @@
-fname: one_with_kl_simple_regret_on_change_scale
+fname: one_with_kl_simple_regret_add_change_scale
 agent_class: MultiCriticsPPOAgent
 env: EpisodicStreamEnv
 timeseries_network: CTTS

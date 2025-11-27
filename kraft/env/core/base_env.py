@@ -196,6 +196,7 @@ class BaseEnvironment(ABC):
             current_position=self.account.current_position,
             point_delta=self.point_delta,
             execution_strength=self.account.execution_strength,
+            prev_execution_strength=self.account.prev_execution_strength
         )
         return self.get_reward(rinfo, event=event)      # single critic in R, multi critics in R^3
 
