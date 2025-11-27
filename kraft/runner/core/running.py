@@ -252,7 +252,7 @@ def build_memory(state, decoded_action, reward, next_state, done, log_prob, mask
             torch.tensor([reward], dtype=torch.float32),
             next_state,
             torch.tensor([done], dtype=torch.float32),
-            torch.tensor([log_prob], dtype=torch.float32),
+            torch.tensor([log_prob], dtype=torch.float32) if log_prob is not None else torch.tensor([0.0], dtype=torch.float32),
             torch.tensor([mask], dtype=torch.bool),
             torch.tensor([is_entry], dtype=torch.bool),
             torch.tensor([log_return], dtype=torch.float32),

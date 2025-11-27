@@ -37,8 +37,8 @@ class AgentState:
             self.current_position,  
             self.execution_strength / 10.0,  # 0~10 -> 0~1
             (30 - self.n_days_before_ma) / 30.0,  # 0~30 -> 0~1
-            np.tanh(self.realized_pnl / (0.10 * INITIAL_ACCOUNT_BALANCE)),  # KRW -> -1~1
-            np.tanh(self.unrealized_pnl / (0.05 * INITIAL_ACCOUNT_BALANCE)),  # KRW -> -1~1
+            np.tanh(self.realized_pnl / (0.20 * INITIAL_ACCOUNT_BALANCE)),  # KRW -> -1~1
+            np.tanh(self.unrealized_pnl / (0.02 * INITIAL_ACCOUNT_BALANCE)),  # KRW -> -1~1
             np.tanh(self.available_balance / (0.5 * INITIAL_ACCOUNT_BALANCE)),  # KRW -> -1~1
             np.tanh(self.cost / (0.02 * INITIAL_ACCOUNT_BALANCE)),  # KRW -> -1~1
             self.market_regime  # -1,0,+1 -> -1~1

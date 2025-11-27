@@ -139,7 +139,7 @@ class BaseEnvironment(ABC):
             # 그래서 2틱 뒤를 봐야 검증이 가능하다 (1틱 뒤는 15분 데이터)
             # print(f"Compare: current_{self.current_timestep}, account_prev_{self.account.prev_timestep}, account_current_{self.account.current_timestep}")
             # print(f"Daily settlement at {self.current_timestep}")
-            self._maybe_daily_settlement(self.current_point)
+            self.account.daily_settlement(self.current_point)
 
         # 6) 다음 상태 생성
         next_state_obj = self._build_next_state(next_ts_state)

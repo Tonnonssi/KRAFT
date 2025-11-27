@@ -56,7 +56,7 @@ class RewardInfo:
     prev_position: int              # 후회 항목에 이용 
     current_position: int           # 후회 항목에 이용 
     point_delta: float              # 후회 항목에 이용 
-    execution_strength: int         # 만기일에 이용(Bonus)
+    execution_strength: int         # 후회 항목에 이용 
 
     def __len__(self):
         return len(self.__dict__.values())
@@ -95,18 +95,22 @@ class RRPAReward:
         realized_term = info.net_realized_pnl
         unrealized_term = info.current_unrealized_pnl - info.prev_unrealized_pnl
         # return self.log(realized_term) + self.log(unrealized_term)
-        return (realized_term + unrealized_term) / (INITIAL_ACCOUNT_BALANCE * 0.005) # balance base
+        raw = (realized_term + unrealized_term) / (INITIAL_ACCOUNT_BALANCE * 0.005) * 10 # balance base
+        return np.clip(raw, -2.0, 2.0)
         # return (realized_term + info.current_unrealized_pnl) / (INITIAL_ACCOUNT_BALANCE * 0.005)  # 0.5% 수익 기준 스케일링
 
     def _calculate_risk_reward(self, info: RewardInfo) -> float:
         """위험 컴포넌트(R_risk) 계산"""
         portfolio_value_change = self.log(info.current_balance) - self.log(info.prev_balance)
-        return self.DSR(portfolio_value_change)
+        return np.clip(self.DSR(portfolio_value_change) / 2, -1, 1)
 
     def _calculate_regret_penalty(self, info: RewardInfo) -> float:
         """후회(Regret) 페널티 계산"""
-        is_flat = (np.sign(info.current_position) == 0 and np.sign(info.prev_position) == 0)
-        return (abs(info.point_delta)  / (INITIAL_ACCOUNT_BALANCE * 0.01)) if is_flat else 0.0 
+        # 포지션을 잡지 않고 시장이 크게 움직였을 때의 후회 반영
+        if info.current_position == 0 and info.prev_position == 0:
+            return abs(info.point_delta) * CONTRACT_UNIT / (INITIAL_ACCOUNT_BALANCE * 0.005) * 10 
+        else:
+            return 0.0
 
     def _apply_event_bonus_penalty(self, base_reward: float, event, reward_info) -> float:
         """이벤트에 따른 보너스 및 페널티 적용"""

@@ -118,7 +118,7 @@ class MultiCriticsPPOAgent(PPOAgent):
             current_log_probs = action_dist.log_prob(encoded_actions).unsqueeze(1)
 
             # KL Divergence based regularization
-            # entry_reg = self._get_entry_regulation(current_logits, entry_masks, entry_scores)
+            entry_reg = self._get_entry_regulation(current_logits, entry_masks, entry_scores)
 
             # 3 elements of loss : value_loss, clip_loss, entropy bonus 
             with torch.no_grad():
@@ -129,7 +129,7 @@ class MultiCriticsPPOAgent(PPOAgent):
             clip_loss = self.clip_loss_ftn(advantages.detach(), old_log_probs.detach(), current_log_probs)
             entropy = action_dist.entropy().mean()
 
-            total_loss = -clip_loss + self.value_coeff * value_loss - self.entropy_coeff * entropy # + self.entry_coeff * entry_reg
+            total_loss = -clip_loss + self.value_coeff * value_loss - self.entropy_coeff * entropy + self.entry_coeff * entry_reg
 
             losses += total_loss.item()
 
