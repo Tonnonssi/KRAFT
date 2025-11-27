@@ -132,9 +132,13 @@ class BaseEnvironment(ABC):
             liq_pnl, liq_cost = self._maybe_liquidate(self.current_point)
             net_pnl += liq_pnl
             cost += liq_cost
-
+        
         # 5) 일자 변경 시 일일 정산
-        if is_day_changed(self.account.prev_timestep, self.current_timestep) and self.current_point is not None:
+        if is_day_changed(self.current_timestep, self.two_ticks_later) and self.current_point is not None:
+            # two ticks later로 보는 이유는, 실제 장 마감 시간은 15분, 우리는 5분에 거래를 종료하는 걸 전제로 함 
+            # 그래서 2틱 뒤를 봐야 검증이 가능하다 (1틱 뒤는 15분 데이터)
+            # print(f"Compare: current_{self.current_timestep}, account_prev_{self.account.prev_timestep}, account_current_{self.account.current_timestep}")
+            # print(f"Daily settlement at {self.current_timestep}")
             self._maybe_daily_settlement(self.current_point)
 
         # 6) 다음 상태 생성
@@ -216,6 +220,7 @@ class BaseEnvironment(ABC):
     def _reset_base(self):
         """기본으로 초기화되어야 하는 것"""
         self.account.reset()
+        self.account.current_timestep = self.current_timestep
         self.episode_event = Event()
         self.step_event = self.episode_event.step_event
 
