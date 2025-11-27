@@ -268,7 +268,7 @@ class BaseEnvironment(ABC):
         Multi-Critics PPO에서 사용하는 α 초기화, single critic에서는 사용하지 않는다.
         한 에피소드 동안 고정된다. 
         """
-        self.alpha = torch.tensor([0.6, 0.3, 0.1], dtype=torch.float32)
+        self.alpha = torch.tensor([0.4, 0.2, 0.4], dtype=torch.float32)
         # self.alpha = Dirichlet(torch.tensor(self.alpha_parameters, dtype=torch.float32)).sample().detach()
 
     @property
