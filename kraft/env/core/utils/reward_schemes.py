@@ -95,17 +95,21 @@ class RRPAReward:
         realized_term = info.net_realized_pnl
         unrealized_term = info.current_unrealized_pnl - info.prev_unrealized_pnl
         # return self.log(realized_term) + self.log(unrealized_term)
-        return (realized_term + unrealized_term) / (INITIAL_ACCOUNT_BALANCE * 0.005) # balance base
+        raw = (realized_term + unrealized_term) / (INITIAL_ACCOUNT_BALANCE * 0.005) # balance base
+
+        return np.clip(raw, -2, 2)
         # return (realized_term + info.current_unrealized_pnl) / (INITIAL_ACCOUNT_BALANCE * 0.005)  # 0.5% 수익 기준 스케일링
 
     def _calculate_risk_reward(self, info: RewardInfo) -> float:
         """위험 컴포넌트(R_risk) 계산"""
         portfolio_value_change = self.log(info.current_balance) - self.log(info.prev_balance)
-        return np.clip(self.DSR(portfolio_value_change), -2, 2)
+        return np.clip(self.DSR(portfolio_value_change)/2, -2, 2)
 
     def _calculate_regret_penalty(self, info: RewardInfo) -> float:
         """후회(Regret) 페널티 계산"""
-        regret_unit =  CONTRACT_UNIT / (INITIAL_ACCOUNT_BALANCE * 0.05) 
+        regret_unit =  CONTRACT_UNIT / (INITIAL_ACCOUNT_BALANCE * 0.00025) 
+        un_pnl, prev_un_pnl = info.current_unrealized_pnl, info.prev_unrealized_pnl
+        threshold = 0.0001 * INITIAL_ACCOUNT_BALANCE  # 0.05% 미만의 변화는 무시
 
         # 1. 포지션을 잡지 않고 시장이 움직였을 때의 후회 반영
         if info.current_position == 0 and info.prev_position == 0:
@@ -116,6 +120,10 @@ class RRPAReward:
             if np.sign(info.prev_position * info.point_delta) < 0:
                 return abs(info.point_delta) * regret_unit 
             return 0.0
+        
+        elif info.net_realized_pnl == 0.0 and prev_un_pnl > threshold and prev_un_pnl > un_pnl:
+            raw = abs(prev_un_pnl - un_pnl) / (INITIAL_ACCOUNT_BALANCE * 0.00025)  # 0.1% 기준 스케일링
+            return np.clip(raw, 0.0, 2.0)
         # 3. 기타 상황에서는 후회 없음
         else:
             return 0.0

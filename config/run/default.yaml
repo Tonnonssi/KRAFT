@@ -1,4 +1,4 @@
-fname: 424with10actions
+fname: 424with10actions_reward_v2
 agent_class: MultiCriticsPPOAgent
 env: EpisodicStreamEnv
 timeseries_network: CTTS
