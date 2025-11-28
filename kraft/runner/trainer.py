@@ -80,10 +80,16 @@ class Trainer:
             cb.on_train_begin(common_log)
 
         self.agent.model.train()
-        result =  run_loop(env, self.agent, 
-                            self.config.agent.batch_size, self.config.agent.n_steps, 
-                            is_training=True, device=self.device, callbacks=self.callbacks, 
-                            multi_critics=self.config.run.multi_critics) 
+        result =  run_loop(
+            env,
+            self.agent,
+            self.config.agent.batch_size,
+            self.config.agent.n_steps,
+            is_training=True,
+            device=self.device,
+            callbacks=self.callbacks,
+            multi_critics=self.config.run.multi_critics
+        ) 
 
         for cb in self.callbacks:
             cb.on_train_end(common_log)
@@ -120,7 +126,8 @@ class Trainer:
                 is_training=False,
                 device=self.device,
                 callbacks=self.callbacks,
-                multi_critics=self.config.run.multi_critics
+                multi_critics=self.config.run.multi_critics,
+                max_total_steps=env.max_steps
             )
 
         # 검증 종료 

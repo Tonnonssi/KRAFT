@@ -110,7 +110,7 @@ def _run_episode_multi_critics(env, agent, n_steps, device, callbacks=None, stoc
 
     return epi_memory, epi_reward, env.episode_event
 
-def run_loop(env, agent, batch_size, n_steps, is_training: bool, device, callbacks=None, multi_critics=False):
+def run_loop(env, agent, batch_size, n_steps, is_training: bool, device, callbacks=None, multi_critics=False, max_total_steps: int | None = None):
     """
     Train, Valid, Test의 공통 로직을 처리하는 핵심 루프.
     is_training 플래그에 따라 학습 관련 동작을 제어한다.
@@ -121,6 +121,7 @@ def run_loop(env, agent, batch_size, n_steps, is_training: bool, device, callbac
     _episode_cum_reward = 0
     loss = None
     idx = 0
+    total_steps = 0
 
     # --- 메인 루프 ---
     while not env.terminated:
@@ -128,6 +129,7 @@ def run_loop(env, agent, batch_size, n_steps, is_training: bool, device, callbac
         # is_training 플래그를 전달하여 에이전트가 탐험(train) 또는 결정적 행동(valid/test)을 하도록 제어할 수 있음
         epi_memory, epi_reward, episode_event = run_episode(env, agent, n_steps, device, callbacks, multi_critics, is_training)
         _episode_cum_reward += epi_reward
+        total_steps += len(epi_memory)
 
         # 2. 학습 로직 (is_training=True일 때만 실행)
         if is_training:
@@ -180,6 +182,9 @@ def run_loop(env, agent, batch_size, n_steps, is_training: bool, device, callbac
         # 5. 에피소드 종료 시 처리 (공통)
         if env.done:
             _episode_cum_reward = 0
+
+        if max_total_steps is not None and total_steps >= max_total_steps:
+            break
 
         idx += 1
 

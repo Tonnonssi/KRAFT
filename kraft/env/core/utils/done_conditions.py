@@ -76,7 +76,9 @@ def is_max_step(max_steps, maintained_steps):
     스윙의 최대 길이에 도달했는가? 
     done=True
     """
-    done = (max_steps == maintained_steps)
+    # maintained_steps는 직전에 완료된 스텝 수이므로,
+    # 현재 진행 중인 스텝까지 포함하려면 +1을 해 비교한다.
+    done = ((maintained_steps + 1) >= max_steps)
     info = 'max_step' if done else ''
     return done, info
 
