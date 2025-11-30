@@ -281,11 +281,8 @@ class BaseEnvironment(ABC):
                     current_position=self.account.current_position,
                     execution_strength=self.account.execution_strength,
                     n_days_before_ma=self.n_days_before_maturity,
-                    realized_pnl=self.account.realized_pnl,
-                    unrealized_pnl=self.account.unrealized_pnl,   
-                    available_balance=self.account.available_balance,
-                    cost=self.account.total_transaction_costs,
-                    market_regime=0)    # self.market_regime
+                    equity=self.account.balance,
+                    market_regime=self.market_regime)    
     
     @property
     def market_regime(self):
