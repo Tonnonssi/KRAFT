@@ -98,6 +98,7 @@ class MultiCriticsPPOAgent(PPOAgent):
             return 0
         
         losses = 0
+        current_entropy_coeff = self._entropy_coeff_for_update()
 
         for _ in range(self.epoch):
             # set memory
@@ -129,7 +130,7 @@ class MultiCriticsPPOAgent(PPOAgent):
             clip_loss = self.clip_loss_ftn(advantages.detach(), old_log_probs.detach(), current_log_probs)
             entropy = action_dist.entropy().mean()
 
-            total_loss = -clip_loss + self.value_coeff * value_loss - self.entropy_coeff * entropy + self.entry_coeff * entry_reg
+            total_loss = -clip_loss + self.value_coeff * value_loss - current_entropy_coeff * entropy + self.entry_coeff * entry_reg
 
             losses += total_loss.item()
 
@@ -139,6 +140,7 @@ class MultiCriticsPPOAgent(PPOAgent):
             nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
             self.optimizer.step()
 
+        self._advance_entropy_coeff()
         return losses / self.epoch
     
     def _get_adantage_info(self, memory):

@@ -56,7 +56,7 @@ class AgentConfig:
     n_steps: int
     batch_size: int
     value_coeff: float
-    entropy_coeff: float
+    entropy_coeff: Union[float, Dict[str, Any]]
     clip_eps: float
     gamma: float
     lr: float

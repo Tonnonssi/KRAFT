@@ -2,7 +2,10 @@ algo: PPOAgent
 n_steps: 2048
 batch_size: 1260
 value_coeff: 0.5
-entropy_coeff: 0.05
+entropy_coeff:
+  start: 0.03
+  end: 0.005
+  steps: 10000000  # number of PPO updates to reach the end value
 clip_eps: 0.25
 gamma: 0.9
 lr: 0.0003
@@ -11,4 +14,3 @@ kappa: 2.0
 beta: 1.0
 regulation: 3.0
 gae_lam: 0.95
-

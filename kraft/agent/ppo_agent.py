@@ -4,7 +4,24 @@ import torch.optim as optim
 from torch.distributions import Categorical
 
 import numpy as np
-from typing import List, Optional, Tuple
+from collections.abc import Mapping
+from typing import Optional, Tuple
+
+
+class _LinearEntropySchedule:
+    """Simple helper for linear entropy-coefficient decay."""
+
+    def __init__(self, start: float, end: float, steps: int):
+        steps = int(steps)
+        if steps <= 0:
+            raise ValueError("Linear entropy schedule requires steps > 0")
+        self.start = float(start)
+        self.end = float(end)
+        self.steps = steps
+
+    def value_at(self, step: int) -> float:
+        ratio = min(max(step, 0) / self.steps, 1.0)
+        return self.start + (self.end - self.start) * ratio
 
 
 class PPOAgent:
@@ -33,7 +50,9 @@ class PPOAgent:
 
         # coeffs • epsilon 
         self.value_coeff = value_coeff              # 오류 함수 업데이트 시, 가치 반영 정도
-        self.entropy_coeff = entropy_coeff          # 오류 함수 업데이트 시, 엔트로피 반영 정도
+        self._entropy_schedule = None
+        self._entropy_schedule_step = 0
+        self.entropy_coeff = self._init_entropy_coeff(entropy_coeff)
         self.clip_eps = clip_eps                    # 오류 함수 클리핑 정도 (PPO 핵심)
 
         # KL div related 
@@ -53,6 +72,37 @@ class PPOAgent:
 
         self.epoch = train_epoch                          # 에폭 크기 
         self.batch_size = batch_size                # 배치 크기 
+
+    def _init_entropy_coeff(self, entropy_coeff):
+        """Allow entropy coeff to be configured as scalar or schedule."""
+        if isinstance(entropy_coeff, Mapping):
+            return self._build_entropy_schedule(entropy_coeff)
+        return float(entropy_coeff)
+
+    def _build_entropy_schedule(self, spec: Mapping):
+        if 'start' not in spec:
+            raise ValueError("entropy_coeff.start is required when specifying a schedule")
+        start = float(spec.get('start'))
+        end = float(spec.get('end', start))
+        raw_steps = spec.get('steps', spec.get('updates'))
+        steps = int(raw_steps) if raw_steps is not None else 1
+        steps = max(steps, 1)
+        self._entropy_schedule = _LinearEntropySchedule(start, end, steps)
+        return start
+
+    def _entropy_coeff_for_update(self) -> float:
+        if self._entropy_schedule is None:
+            return self.entropy_coeff
+        current = self._entropy_schedule.value_at(self._entropy_schedule_step)
+        self.entropy_coeff = current
+        return current
+
+    def _advance_entropy_coeff(self):
+        if self._entropy_schedule is None:
+            return
+        if self._entropy_schedule_step < self._entropy_schedule.steps:
+            self._entropy_schedule_step += 1
+        self.entropy_coeff = self._entropy_schedule.value_at(self._entropy_schedule_step)
 
     def get_action(self, 
                    state:torch.Tensor, 
@@ -221,6 +271,7 @@ class PPOAgent:
             return 0
         
         losses = 0
+        current_entropy_coeff = self._entropy_coeff_for_update()
 
         for _ in range(self.epoch):
             # set memory
@@ -250,7 +301,7 @@ class PPOAgent:
             clip_loss = self.clip_loss_ftn(advantages.detach(), old_log_probs.detach(), current_log_probs)
             entropy = action_dist.entropy().mean()
 
-            total_loss = -clip_loss + self.value_coeff * value_loss - self.entropy_coeff * entropy + self.entry_coeff * entry_reg
+            total_loss = -clip_loss + self.value_coeff * value_loss - current_entropy_coeff * entropy + self.entry_coeff * entry_reg
 
             losses += total_loss.item()
 
@@ -260,6 +311,7 @@ class PPOAgent:
             nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
             self.optimizer.step()
 
+        self._advance_entropy_coeff()
         return losses / self.epoch
     
     def _get_entry_regulation(self, current_logits, entry_masks, entry_scores):
