@@ -123,17 +123,20 @@ class BaseEnvironment(ABC):
         # 2) 주문 체결/계좌 반영
         net_pnl, cost = self._execute_action(decoded_action)
 
-        # 3) 종료 여부/이벤트 판정
+        # 3) 스텝 카운트 업데이트 (done 체크는 현재 스텝 포함)
+        self.maintained += 1
+
+        # 4) 종료 여부/이벤트 판정
         done, step_events_list = self.done_n_event
         self.episode_event.collect_information(step_events_list)
 
-        # 4) 필요 시 강제 청산 (만기/파산 등)
+        # 5) 필요 시 강제 청산 (만기/파산 등)
         if any(event in self.step_event for event in self.liquidation_status_list) and self.current_point is not None:
             liq_pnl, liq_cost = self._maybe_liquidate(self.current_point)
             net_pnl += liq_pnl
             cost += liq_cost
         
-        # 5) 일자 변경 시 일일 정산
+        # 6) 일자 변경 시 일일 정산
         if is_day_changed(self.current_timestep, self.two_ticks_later) and self.current_point is not None:
             # two ticks later로 보는 이유는, 실제 장 마감 시간은 15분, 우리는 5분에 거래를 종료하는 걸 전제로 함 
             # 그래서 2틱 뒤를 봐야 검증이 가능하다 (1틱 뒤는 15분 데이터)
@@ -141,20 +144,19 @@ class BaseEnvironment(ABC):
             # print(f"Daily settlement at {self.current_timestep}")
             self.account.daily_settlement(self.current_point)
 
-        # 6) 다음 상태 생성
+        # 7) 다음 상태 생성
         next_state_obj = self._build_next_state(next_ts_state)
 
-        # 7) 보상 계산
+        # 8) 보상 계산
         reward = self._compute_reward(event=self.step_event)
 
-        # 8) 마스크/관찰 준비
+        # 9) 마스크/관찰 준비
         mask = self.mask
         obs = next_state_obj()  # 기존 State의 __call__ 사용 패턴 유지
         self.current_state = obs
 
-        # 9) 거래 정보를 업데이트 
+        # 10) 거래 정보를 업데이트 
         self._update_trades_info()
-        self.maintained += 1
 
         return obs, reward, done, mask
     
@@ -277,11 +279,8 @@ class BaseEnvironment(ABC):
                     current_position=self.account.current_position,
                     execution_strength=self.account.execution_strength,
                     n_days_before_ma=self.n_days_before_maturity,
-                    realized_pnl=self.account.realized_pnl,
-                    unrealized_pnl=self.account.unrealized_pnl,   
-                    available_balance=self.account.available_balance,
-                    cost=self.account.total_transaction_costs,
-                    market_regime=0)    # self.market_regime
+                    equity=self.account.balance,
+                    market_regime=self.market_regime)    
     
     @property
     def market_regime(self):
