@@ -1,4 +1,4 @@
-fname: 2
+fname: 2_without_kl
 agent_class: MultiCriticsPPOAgent
 env: EpisodicStreamEnv
 timeseries_network: CTTS

@@ -6,7 +6,7 @@ entropy_coeff: 0.01
 clip_eps: 0.20
 gamma: 0.95
 lr: 0.0003
-entry_coeff: 0.1
+entry_coeff: 0
 kappa: 2.0
 beta: 1.0
 regulation: 3.0
