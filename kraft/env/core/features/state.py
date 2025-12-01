@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from typing import Dict, List, Tuple, Optional, Any
 from dataclasses import dataclass
 from .. import _specification as spec
@@ -12,12 +13,17 @@ class AgentState:
     n_days_before_ma: int       # 만기일까지 남은 날
     equity: float               # 자산 총액 (KRW)
     market_regime: int          # 단기적 시장 국면(-1,0,+1)
+    time_remaining_ratio: float # 당일마감까지 남은 시간 비율(0~1)
+    near_market_closing: int    # 당일 마감 임박 여부 (30분 전) (0,1)
+
+    def __len__(self):
+        return len(self.__dataclass_fields__)
 
     def __call__(self) -> list:
         """list로 전달"""
-        return self.scale()
+        return self._scale()
     
-    def scale(self):
+    def _scale(self):
         """
         [-1,1] 사이로 스케일링 
         ------------------------------
@@ -34,7 +40,9 @@ class AgentState:
             self.execution_strength / 10.0,  # 0~10 -> 0~1
             (30 - self.n_days_before_ma) / 30.0,  # 0~30 -> 0~1
             np.tanh(equity_norm / 0.2),  # ± 20% 변동에서 tanh 활발하게 변화 
-            self.market_regime  # -1,0,+1 -> -1~1
+            self.market_regime,  # -1,0,+1 -> -1~1
+            self.time_remaining_ratio,  # 0~1 유지
+            self.near_market_closing  # 0,1 유지
         ]
 
 @dataclass(frozen=True)

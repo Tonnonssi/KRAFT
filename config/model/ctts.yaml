@@ -1,5 +1,5 @@
 name: CTTS
-agent_input_dim: 5
+agent_input_dim: 7
 timeseries_embed_dim: 32
 kernel_size: 4
 stride: 1
