@@ -1,19 +1,25 @@
 path: data/processed/kospi200_ffill_clean_version.pkl
 window_size: 80
-scaler: RobustScaler
+scaler: None # RobustScaler
 target_ts_values:
-  - close
-  - high
-  - low
-  - volume_change
-  - ema_5
-  - ema_20
+  - log_return
+  - return_5
+  - return_20
+  - score
   - ema_cross
-  - rsi
-  - "%K"
-  - "%D"
-  - cci
-  - atr
-  - bb_width
-  - obv
 
+  - dist_ma_60
+  - dist_ma_390
+  - macd_hist_norm
+
+  - realized_vol_10
+  - hl_ratio
+  - bb_width
+  - atr
+  - bb_pband
+  - gap_size
+
+  - volume_change
+  - vol_ratio
+  - vpt_proxy
+  - rsi

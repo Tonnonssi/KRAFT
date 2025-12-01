@@ -137,6 +137,7 @@ class FuturesDataset(Dataset):
             group = add_momentum_indicators(group)
             group = add_volume_indicators(group)
             group = add_volatility_indicators(group)
+            group = add_macd_indicators(group)
             result.append(group)
 
         return pd.concat(result)

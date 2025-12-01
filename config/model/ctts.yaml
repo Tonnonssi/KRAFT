@@ -1,13 +1,12 @@
 name: CTTS
 agent_input_dim: 7
-timeseries_embed_dim: 32
+timeseries_embed_dim: 18
 kernel_size: 4
 stride: 1
 agent_hidden_dim: 32
 agent_out_dim: 32
 fusion_hidden_dim: 64
 num_layers: 3
-num_heads: 4
+num_heads: 3
 d_ff: 64
 dropout: 0.1
-
