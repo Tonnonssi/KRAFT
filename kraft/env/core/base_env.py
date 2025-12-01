@@ -5,6 +5,7 @@ import torch
 from torch.distributions.dirichlet import Dirichlet 
 from typing import Dict, List, Tuple, Optional, Any
 
+
 from .features.dataset import FuturesDataset
 from .features.risk import *
 from .features.state import State, AgentState
@@ -43,6 +44,7 @@ class BaseEnvironment(ABC):
 
         self.raw_df = raw_df                        # 전체 데이터 셋 
         self.date_range = date_range                # 데이터 범위 (start, end)
+        self.open_close_timestep_df = self._get_market_open_close_timestep(raw_df)
         self.target_df = slice_by_date_range(raw_df, date_range) # 이 환경에서 사용할 데이터 
 
         self.scaler = scaler                        # timeseries data에 적용할 스케일러  
@@ -273,6 +275,32 @@ class BaseEnvironment(ABC):
         self.alpha = torch.tensor([0.4, 0.2, 0.4], dtype=torch.float32)
         # self.alpha = Dirichlet(torch.tensor(self.alpha_parameters, dtype=torch.float32)).sample().detach()
 
+    def _get_market_open_close_timestep(self, df) -> pd.DataFrame:
+        '''장 마감 df를 구하는 함수'''
+        if not isinstance(df.index, pd.DatetimeIndex):
+            raise TypeError("DataFrame index must be a DatetimeIndex.")
+        
+        # Group by the date part of the index
+        grouped_by_date = df.groupby(df.index.date)
+
+        closing_timesteps = []
+        opening_timesteps = []
+        unique_dates_with_closing_timestep = []
+
+        # Iterate through each group (each unique date)
+        for date, group in grouped_by_date:
+            # Check if the group has at least two entries to safely access index[-2]
+            opening_timesteps.append(group.index[0])  # 해당 날짜의 첫 번째 타임스탬프 
+            if len(group.index) >= 2:
+                unique_dates_with_closing_timestep.append(date)
+                closing_timesteps.append(group.index[-2]) # Get the second to last timestamp for the day
+
+        # Return the result in the user's requested format
+        result_df = pd.DataFrame({'opening_timestep': opening_timesteps, 
+                                  'closing_timestep': closing_timesteps}, 
+                                  index=unique_dates_with_closing_timestep)
+        return result_df
+
     @property
     def agent_state(self) -> AgentState:
         return AgentState(
@@ -280,7 +308,28 @@ class BaseEnvironment(ABC):
                     execution_strength=self.account.execution_strength,
                     n_days_before_ma=self.n_days_before_maturity,
                     equity=self.account.balance,
-                    market_regime=self.market_regime)    
+                    market_regime=self.market_regime, 
+                    time_remaining_ratio=self.time_remaining_ratio,
+                    near_market_closing=self.near_market_closing)  
+
+    @property
+    def time_remaining_ratio(self):
+        """당일 마감까지 남은 시간 비율 [0~1]"""
+        c = self.current_timestep
+        s = self.open_close_timestep_df.loc[c.date(), 'opening_timestep']
+        e = self.open_close_timestep_df.loc[c.date(), 'closing_timestep']
+
+        daily_total_minutes = (e - s).total_seconds() / 60
+        remaining_minutes = (e - c).total_seconds() / 60
+        return remaining_minutes / daily_total_minutes
+
+    @property
+    def near_market_closing(self):
+        """당일 마감 임박 여부 (30분 전) [0/1]"""
+        c = self.current_timestep
+        e = self.open_close_timestep_df.loc[c.date(), 'closing_timestep']
+        time_diff = (e - c).total_seconds() / 60  # 분 단위 차이
+        return 0 if time_diff > 30 else 1
     
     @property
     def market_regime(self):
