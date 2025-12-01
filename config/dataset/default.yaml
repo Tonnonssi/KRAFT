@@ -1,6 +1,6 @@
 path: data/processed/kospi200_ffill_clean_version.pkl
 window_size: 80
-scaler: RobustScaler
+scaler: StandardScaler # MinMaxScaler # RobustScaler
 target_ts_values:
   - close
   - high

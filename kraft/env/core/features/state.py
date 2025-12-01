@@ -4,7 +4,7 @@ from typing import Dict, List, Tuple, Optional, Any
 from dataclasses import dataclass
 from .. import _specification as spec
 
-INITIAL_ACCOUNT_BALANCE = 30_000_000
+INITIAL_ACCOUNT_BALANCE = 3_000_000
 
 @dataclass(frozen=True)
 class AgentState:

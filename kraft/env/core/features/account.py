@@ -341,7 +341,7 @@ class Account:
     def is_insufficient_for_new_contract(self):
         # 현재가 기준 1계약도 더 체결 불가능한 상태 
         min_contract_margin = self.market_pt * self.initial_margin_rate * self.contract_unit
-        return self.balance - self.maintenance_margin < min_contract_margin
+        return self.balance < min_contract_margin
 
     @property
     def balance(self) -> float:

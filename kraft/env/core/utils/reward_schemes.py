@@ -62,7 +62,7 @@ class RewardInfo:
     def __len__(self):
         return len(self.__dict__.values())
 
-INITIAL_ACCOUNT_BALANCE = 30_000_000
+INITIAL_ACCOUNT_BALANCE = 3_000_000
 
 class RRPAReward:
     """RRPAReward (Risk Regret Profit Aware Reward)"""
@@ -172,8 +172,9 @@ class MultiRRPAReward(RRPAReward):
         주어진 데이터(info)와 이벤트(event)를 바탕으로 최종 보상을 계산.
         클래스 인스턴스를 함수처럼 호출할 수 있게 함.
         """
-        r_profit = self._calculate_profit_reward(reward_info)
+        r_profit = self._calculate_profit_reward(reward_info) * 100
         r_risk = self._calculate_risk_reward(reward_info)
         r_regret = - self._calculate_regret_penalty(reward_info)
 
-        return round(r_profit,4), round(r_risk,4), round(r_regret,4)
+        # return round(r_profit,4), round(r_risk,4), round(r_regret,4)
+        return round(r_profit,4), 0, 0

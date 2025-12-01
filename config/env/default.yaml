@@ -1,4 +1,4 @@
-slippage: 0.001
-start_budget: 30000000  # KRW
+slippage: 0 # 0.001
+start_budget: 3000000 # 30000000  # KRW
 max_steps: 1000
 pnl_threshold: 0.05
