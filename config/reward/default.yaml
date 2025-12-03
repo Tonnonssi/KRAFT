@@ -1,6 +1,6 @@
 w_profit: 1 # .4
 w_risk: 0  # .2
-w_regret: 1 # .4
+w_regret: 0 # .4
 margin_call_penalty: 0 # -5.0
 maturity_date_penalty: 0 # -0.5
 bankrupt_penalty: 0 # -5.0
