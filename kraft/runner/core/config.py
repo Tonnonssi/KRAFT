@@ -78,7 +78,7 @@ class EnvConfig:
 class DatasetConfig:
     path: str
     window_size: int
-    scaler: str  # e.g., "RobustScaler"
+    scaler: Optional[str]  # e.g., "RobustScaler" or None
     # Prefer list in YAML; string (comma-separated) is also accepted for backward-compat.
     target_ts_values_str: Optional[str] = None
     target_ts_values: Optional[list] = None

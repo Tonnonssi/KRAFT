@@ -112,6 +112,7 @@ class FuturesDataset(Dataset):
         df = add_momentum_indicators(df)
         df = add_volume_indicators(df)
         df = add_volatility_indicators(df)
+        df = add_macd_indicators(df)
 
         return df
     

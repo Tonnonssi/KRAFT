@@ -15,7 +15,7 @@ class Trainer:
         self.agent = agent 
         self.env_class = env_class
         self.reward_ftn = reward_ftn
-        self.scaler = scaler_class()
+        self.scaler = scaler_class() if scaler_class is not None else None
         self.df = df
         self.config = config 
         self.early_stop = False 

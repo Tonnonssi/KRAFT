@@ -61,7 +61,17 @@ def _run(cfg: DictConfig):
 
     # Resolve classes
     env_cls = resolve_class(cfg.run.env, "kraft.env")
-    scaler_cls = resolve_class(cfg.dataset.scaler, "kraft.env.core.features.dataset.utils.scaler")
+
+    scaler_name = cfg.dataset.scaler
+    if isinstance(scaler_name, str):
+        normalized = scaler_name.strip().lower()
+        use_scaler = normalized not in ("", "none", "null")
+    else:
+        use_scaler = scaler_name is not None
+
+    scaler_cls = None
+    if use_scaler:
+        scaler_cls = resolve_class(scaler_name, "kraft.env.core.features.dataset.utils.scaler")
 
     df = get_df(to_absolute_path(cfg.dataset.path))
 
