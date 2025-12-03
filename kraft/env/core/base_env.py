@@ -172,7 +172,7 @@ class BaseEnvironment(ABC):
         # 거래 성공 횟수, 손익 실현 횟수 업데이트 
         if self.account.settled:
             self.n_total_trades += 1
-            if self.account.net_realized_pnl > 0:
+            if self.account.last_trade_true_pnl > 0:
                 self.n_win_trades += 1
 
     def _execute_action(self, decoded_action: int) -> Tuple[float, float]:

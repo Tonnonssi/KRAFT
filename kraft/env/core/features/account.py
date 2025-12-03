@@ -39,6 +39,8 @@ class Account:
 
         # 포지션 (체결 계약)
         self.open_interest_list = []            # 미결제약정 리스트 (pt)
+        self.open_interest_entry_prices = []    # 최초 진입가 리스트 (pt)
+        self.open_interest_entry_costs = []     # 계약별 진입 비용 (KRW)
         self.current_name_value = 0             # 보유 계약의 명목 가치 (pt)
         self.maintenance_margin = 0             # 보유 계약에 대한 유지증거금 (KRW)
 
@@ -57,6 +59,7 @@ class Account:
         self.net_realized_pnl = 0               # 현 스텝의 실제 실현 손익 (KRW)
         self.unrealized_pnl = 0                 # 미실현 손익 (KRW)
         self.total_transaction_costs = 0        # 총 수수료 (KRW)
+        self.last_trade_true_pnl = 0            # 직전 청산 기준 실제 손익 (KRW)
 
         # 이전 정보
         self.prev_realized_pnl = 0              # 이전 누적 실현 손익 (KRW)
@@ -83,6 +86,7 @@ class Account:
 
         # 초기화 
         self.net_realized_pnl = 0
+        self.last_trade_true_pnl = 0
         self.settled = False                 
         self.concluded = False
 
@@ -135,12 +139,15 @@ class Account:
 
         # 계약 추가
         self.open_interest_list.extend([market_pt for _ in range(vol)])
+        self.open_interest_entry_prices.extend([market_pt for _ in range(vol)])
         self.current_name_value += name_value
         self.execution_strength += vol
 
         # 총 비용(수수료+슬리피지) 계산
         cost = self._get_cost(vol, market_pt)
         self.total_transaction_costs += cost
+        per_contract_cost = (cost / vol) if vol else 0
+        self.open_interest_entry_costs.extend([per_contract_cost for _ in range(vol)])
 
         # 계좌 변동
         self.available_balance -= initial_margin + cost # 가용 잔고에서 초기 증거금과 수수료를 제함 
@@ -178,11 +185,16 @@ class Account:
             # 일부 청산
             settled_contract = self.open_interest_list[:vol]
             settled_value = sum(np.abs(settled_contract))
+            settled_entry_prices = self.open_interest_entry_prices[:vol]
+            settled_entry_costs = self.open_interest_entry_costs[:vol]
+            position_closed = self.current_position
             pnl = self._get_pnl(market_pt, vol) 
             settled_initial_margin = settled_value * self.contract_unit * self.initial_margin_rate
 
             # 계약 청산
             del self.open_interest_list[:vol]
+            del self.open_interest_entry_prices[:vol]
+            del self.open_interest_entry_costs[:vol]
             self.current_name_value -= settled_value
             self.execution_strength -= vol
 
@@ -193,6 +205,9 @@ class Account:
             # 실현 손익
             net_pnl = pnl - cost
             self.realized_pnl += net_pnl
+            gross_true_pnl = self._calculate_true_trade_pnl(settled_entry_prices, market_pt, position_closed)
+            total_entry_cost = sum(settled_entry_costs)
+            self.last_trade_true_pnl = round(gross_true_pnl - total_entry_cost - cost, 1)
 
             # 계좌 변동
             self.available_balance += settled_initial_margin + net_pnl
@@ -208,12 +223,20 @@ class Account:
         # 손익, 비용(수수료+슬리피지)
         pnl = self._get_pnl(market_pt, self.execution_strength) 
         cost = self._get_cost(self.execution_strength, market_pt)
+        entry_prices = list(self.open_interest_entry_prices)
+        entry_costs = list(self.open_interest_entry_costs)
+        position_closed = self.current_position
+        gross_true_pnl = self._calculate_true_trade_pnl(entry_prices, market_pt, position_closed)
+        total_entry_cost = sum(entry_costs)
+        self.last_trade_true_pnl = round(gross_true_pnl - total_entry_cost - cost, 1)
 
         # 순손익
         net_pnl = pnl - cost
         
         # 전체 계약 청산
         self.open_interest_list.clear()
+        self.open_interest_entry_prices.clear()
+        self.open_interest_entry_costs.clear()
         self.current_name_value = 0
         self.current_position = 0
         self.execution_strength = 0
@@ -231,6 +254,14 @@ class Account:
         self._update_account(market_pt)
 
         return round(net_pnl,1), cost
+
+    def _calculate_true_trade_pnl(self, entry_prices, exit_price, position_sign):
+        """원천 진입가 대비 실제 손익(KRW)을 계산한다."""
+        if position_sign == 0 or len(entry_prices) == 0:
+            return 0.0
+        entry_arr = np.array(entry_prices, dtype=float)
+        price_diff = (exit_price - entry_arr) * position_sign
+        return float(np.sum(price_diff) * self.contract_unit)
         
     def _return_margin_deposit(self, net_pnl):
         """전체 증거금을 반환한다."""
