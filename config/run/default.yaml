@@ -1,8 +1,8 @@
-fname: baseline_time_added_agentstate
+fname: baseline_single_diff_state_multi_critics
 agent_class: MultiCriticsPPOAgent
 env: EpisodicStreamEnv
 timeseries_network: CTTS
-multi_critics: False
+multi_critics: True
 train_epoch: 10
 print_step_log_in: 100
 print_episode_log_in: 1

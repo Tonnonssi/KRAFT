@@ -1,6 +1,6 @@
 defaults:
   - run: default
-  - agent: ppo # multi_critics_ppo
+  - agent: multi_critics_ppo # multi_critics_ppo
   - env: default
   - dataset: default
   - action: default

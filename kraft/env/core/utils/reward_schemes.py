@@ -95,7 +95,7 @@ class RRPAReward:
         realized_term = info.net_realized_pnl
         unrealized_term = info.current_unrealized_pnl - info.prev_unrealized_pnl
         # return self.log(realized_term) + self.log(unrealized_term)
-        raw = (realized_term + unrealized_term) / (INITIAL_ACCOUNT_BALANCE * 0.005) # balance base
+        raw = (realized_term + unrealized_term) / (INITIAL_ACCOUNT_BALANCE * 0.001) # balance base
         # raw += realized_term if realized_term > 0 else 0.0  # v3의 차이점 
         return np.clip(raw, -2, 2)
         # return (realized_term + info.current_unrealized_pnl) / (INITIAL_ACCOUNT_BALANCE * 0.005)  # 0.5% 수익 기준 스케일링
@@ -172,9 +172,9 @@ class MultiRRPAReward(RRPAReward):
         주어진 데이터(info)와 이벤트(event)를 바탕으로 최종 보상을 계산.
         클래스 인스턴스를 함수처럼 호출할 수 있게 함.
         """
-        r_profit = self._calculate_profit_reward(reward_info) * 100
-        r_risk = self._calculate_risk_reward(reward_info)
-        r_regret = - self._calculate_regret_penalty(reward_info)
+        r_profit = self._calculate_profit_reward(reward_info) 
+        r_risk = self._calculate_risk_reward(reward_info) * 10
+        r_regret = - self._calculate_regret_penalty(reward_info) * 10
 
         # return round(r_profit,4), round(r_risk,4), round(r_regret,4)
         return round(r_profit,4), 0, 0
