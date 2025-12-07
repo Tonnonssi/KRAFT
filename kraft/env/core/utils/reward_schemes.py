@@ -3,6 +3,80 @@ from typing import ClassVar, List, Optional
 import numpy as np
 from .._specification import CONTRACT_UNIT
 
+def primitive_pnl(reward_info):
+    # 장기 
+    realized_term = reward_info.net_realized_pnl
+    unrealized_term = reward_info.current_unrealized_pnl - reward_info.prev_unrealized_pnl
+    # return self.log(realized_term) + self.log(unrealized_term)
+    raw = (realized_term + unrealized_term) / (INITIAL_ACCOUNT_BALANCE * 0.001) # balance base
+    # raw += realized_term if realized_term > 0 else 0.0  # v3의 차이점 
+    return np.clip(raw, -2, 2)
+    # return (realized_term + info.current_unrealized_pnl) / (INITIAL_ACCOUNT_BALANCE * 0.005)  # 0.5% 수익 기준 스케일링
+
+def delta_equity_pnl(reward_info):
+    delta_equity = reward_info.current_equity - reward_info.prev_equity
+    raw = delta_equity / reward_info.prev_equity * 1000
+    return np.clip(raw, -2, 2)
+
+def delta_equity_without_cost_pnl(reward_info):
+    delta_equity = reward_info.current_equity_without_cost - reward_info.prev_equity_without_cost
+    raw = delta_equity / reward_info.prev_equity_without_cost * 1000
+    return np.clip(raw, -2, 2)
+# ===============
+
+def cal_dsr(reward_info):
+    portfolio_value_change = self.log(reward_info.current_balance) - self.log(reward_info.prev_balance)
+    return np.clip(self.DSR(portfolio_value_change)/2, -2, 2)
+
+def delta_drawdown(reward_info):
+    delta = reward_info.current_drawdown - reward_info.prev_drawdown
+    raw = delta * 1000
+    return np.clip(raw, -2, 2)
+
+def drawdown_base(reward_info):
+    return np.clip(reward_info.current_drawdown * 1000, -2, 2)
+
+# ===============
+
+def transaction_cost(reward_info):
+    # 현재 거래 비용 : 턴오버 비용 
+    raw = (reward_info.cost / reward_info.current_equity * 1000)
+    return np.clip(raw, -2, 2)
+
+def missed_opportunity_regret(info) -> float:
+    if info.prev_position == 0 and info.current_position == 0:
+        # 가격 변화량
+        delta_p = abs(info.point_delta)
+        threshold = 0.4  # 예: 0.4pt 이상일 때만 의미있는 기회로 본다
+        if delta_p < threshold:
+            return 0.0
+        
+        regret_unit = CONTRACT_UNIT / (INITIAL_ACCOUNT_BALANCE * 0.0005)  # 0.05% 기준
+        raw = (delta_p - threshold) * regret_unit
+        return np.clip(raw, 0.0, 2.0)
+    return 0.0
+
+def bad_hold_regret(info) -> float:
+    if info.prev_position != 0 and info.current_position == info.prev_position:
+        # 내 포지션 방향 * 가격 변화
+        signed_move = info.prev_position * info.point_delta
+        
+        if signed_move >= 0:
+            return 0.0  # 내 포지션 방향이랑 같은 방향이면 후회 없음
+
+        # 손실 방향으로 움직인 정도가 threshold 넘을 때만
+        loss_move = abs(signed_move)
+        threshold = 0.2  # 한 0.2pt 이상쯤 되면 의미있는 후회로
+        if loss_move < threshold:
+            return 0.0
+
+        regret_unit = CONTRACT_UNIT / (INITIAL_ACCOUNT_BALANCE * 0.0005)
+        raw = (loss_move - threshold) * regret_unit
+        return np.clip(raw, 0.0, 2.0)
+
+    return 0.0
+
+# ================
 class DifferentialSharpeRatio:
     def __init__(self, span=60, initial_returns=None, epsilon=1e-8):
         if span < 1:
@@ -58,6 +132,13 @@ class RewardInfo:
     point_delta: float              # 후회 항목에 이용 
     execution_strength: int         # 후회 항목에 이용 
     prev_execution_strength: int    # 후회 항목에 이용 
+    prev_equity: float              # 자본금에 이용
+    current_equity: float           # 자본금에 이용
+    prev_equity_without_cost: float  # 자본금(거래 비용 미포함)에 이용
+    current_equity_without_cost: float  # 자본금(거래 비용 미포함)에 이용
+    prev_drawdown: float
+    current_drawdown : float 
+    cost: float                     # 누적 거래 비용에 이용
 
     def __len__(self):
         return len(self.__dict__.values())
@@ -91,42 +172,45 @@ class RRPAReward:
     
     def _calculate_profit_reward(self, info: RewardInfo) -> float:
         """수익 컴포넌트(R_profit) 계산"""
-        # 장기 
-        realized_term = info.net_realized_pnl
-        unrealized_term = info.current_unrealized_pnl - info.prev_unrealized_pnl
-        # return self.log(realized_term) + self.log(unrealized_term)
-        raw = (realized_term + unrealized_term) / (INITIAL_ACCOUNT_BALANCE * 0.001) # balance base
-        # raw += realized_term if realized_term > 0 else 0.0  # v3의 차이점 
-        return np.clip(raw, -2, 2)
-        # return (realized_term + info.current_unrealized_pnl) / (INITIAL_ACCOUNT_BALANCE * 0.005)  # 0.5% 수익 기준 스케일링
-
+        # return primitive_pnl(info)
+        return delta_equity_without_cost_pnl(info)
     def _calculate_risk_reward(self, info: RewardInfo) -> float:
         """위험 컴포넌트(R_risk) 계산"""
-        portfolio_value_change = self.log(info.current_balance) - self.log(info.prev_balance)
-        return np.clip(self.DSR(portfolio_value_change)/2, -2, 2)
+        return delta_drawdown(info)
 
     def _calculate_regret_penalty(self, info: RewardInfo) -> float:
-        """후회(Regret) 페널티 계산"""
-        regret_unit =  CONTRACT_UNIT / (INITIAL_ACCOUNT_BALANCE * 0.00025) 
-        un_pnl, prev_un_pnl = info.current_unrealized_pnl, info.prev_unrealized_pnl
-        threshold = 0.001 * INITIAL_ACCOUNT_BALANCE  # 0.05% 미만의 변화는 무시
+        # 1. 거래 비용 (항상 존재 가능)
+        # cost_term = transaction_cost(info)    # >= 0
+        
+        # 2. 미진입 후회
+        miss_term = missed_opportunity_regret(info)
+        
+        # 3. 홀드 후회
+        hold_term = bad_hold_regret(info)
+        
+        raw = miss_term + hold_term
+        return np.clip(raw, 0.0, 2.0)
+    
+        # regret_unit =  CONTRACT_UNIT / (INITIAL_ACCOUNT_BALANCE * 0.00025) 
+        # un_pnl, prev_un_pnl = info.current_unrealized_pnl, info.prev_unrealized_pnl
+        # threshold = 0.001 * INITIAL_ACCOUNT_BALANCE  # 0.05% 미만의 변화는 무시
 
-        # 1. 포지션을 잡지 않고 시장이 움직였을 때의 후회 반영
-        if info.current_position == 0 and info.prev_position == 0:
-            return np.clip(abs(info.point_delta) * regret_unit, 0.0, 2.0) 
+        # # 1. 포지션을 잡지 않고 시장이 움직였을 때의 후회 반영
+        # if info.current_position == 0 and info.prev_position == 0:
+        #     return np.clip(abs(info.point_delta) * regret_unit, 0.0, 2.0) 
         
-        # 2. 포지션을 유지할 때 손해보는 건데 유지 중.... 
-        elif info.prev_position != 0 and info.current_position == info.prev_position:
-            if np.sign(info.prev_position * info.point_delta) < 0:
-                return np.clip(abs(info.point_delta) * regret_unit, 0.0, 2.0) 
-            return 0.0
+        # # 2. 포지션을 유지할 때 손해보는 건데 유지 중.... 
+        # elif info.prev_position != 0 and info.current_position == info.prev_position:
+        #     if np.sign(info.prev_position * info.point_delta) < 0:
+        #         return np.clip(abs(info.point_delta) * regret_unit, 0.0, 2.0) 
+        #     return 0.0
         
-        elif info.net_realized_pnl == 0.0 and prev_un_pnl > threshold and prev_un_pnl > un_pnl:
-            raw = abs(prev_un_pnl - un_pnl) / (INITIAL_ACCOUNT_BALANCE * 0.00025)  # 0.1% 기준 스케일링
-            return np.clip(raw, 0.0, 2.0)
-        # 3. 기타 상황에서는 후회 없음
-        else:
-            return 0.0
+        # elif info.net_realized_pnl == 0.0 and prev_un_pnl > threshold and prev_un_pnl > un_pnl:
+        #     raw = abs(prev_un_pnl - un_pnl) / (INITIAL_ACCOUNT_BALANCE * 0.00025)  # 0.1% 기준 스케일링
+        #     return np.clip(raw, 0.0, 2.0)
+        # # 3. 기타 상황에서는 후회 없음
+        # else:
+        #     return 0.0
 
     def _apply_event_bonus_penalty(self, base_reward: float, event, reward_info) -> float:
         """이벤트에 따른 보너스 및 페널티 적용"""
@@ -176,5 +260,5 @@ class MultiRRPAReward(RRPAReward):
         r_risk = self._calculate_risk_reward(reward_info) 
         r_regret = - self._calculate_regret_penalty(reward_info)
 
-        # return round(r_profit,4), round(r_risk,4), round(r_regret,4)
-        return round(r_profit,4), 0, 0
+        return round(r_profit,4), round(r_risk,4), round(r_regret,4)
+        # return round(r_profit,4), r_risk, 0

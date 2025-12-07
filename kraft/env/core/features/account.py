@@ -65,9 +65,14 @@ class Account:
         self.prev_realized_pnl = 0              # 이전 누적 실현 손익 (KRW)
         self.prev_unrealized_pnl = 0            # 이전 미실현 손익 
         self.prev_balance = 0                   # 이전 자산 
+        self.prev_equity = 0                    # 이전 자본금
+        self.prev_equity_without_cost = 0       # 이전 자본금 (거래 비용 미포함)
+        self.prev_drawdown = 0
         self.prev_position = 0                  # 이전 포지션, 표기 방식은 위와 동일 
         self.prev_timestep = None               # 이전 시간 
         self.prev_execution_strength = 0        # 이전 체결 강도
+
+        self.peak_equity = 0
 
         self.settled = False                    # 계약 청산 여부
         self.concluded = False                  # 계약 체결 여부
@@ -365,8 +370,11 @@ class Account:
         """
         self.prev_unrealized_pnl = self.unrealized_pnl
         self.prev_balance =self.balance
+        self.prev_equity = self.equity
+        self.prev_equity_without_cost = self.equity_without_cost
         self.prev_position = self.current_position
         self.prev_timestep = self.current_timestep
+        self.prev_drawdown = self.drawdown 
 
     @property
     def is_insufficient_for_new_contract(self):
@@ -378,6 +386,20 @@ class Account:
     def balance(self) -> float:
         # 잔고 (미실현 수익 포함)
         return self.available_balance + self.unrealized_pnl
+    
+    @property
+    def equity(self) -> float:
+        # 자본금 (유지증거금 포함)
+        return self.balance + self.margin_deposit
+    
+    @property
+    def equity_without_cost(self) -> float:
+        # 자본금 (유지증거금 포함)
+        return self.balance + self.margin_deposit + self.total_transaction_costs
+    @property
+    def drawdown(self) -> float:
+        self.peak_equity = max(self.prev_equity, self.equity)
+        return (self.equity - self.peak_equity) / self.peak_equity
 
     def __str__(self):
         """계좌 상태 출력"""     

@@ -76,6 +76,7 @@ class BaseEnvironment(ABC):
 
         self.since_entry = 0                         # 새로운 진입 이후 누적 스텝 수
         self.maintained = 0                          # 스윙 전략 유지 스텝 수  
+        self.cost = 0.0                              # 누적 거래 비용
         self.done = False                            # 에피소드가 끝이 났는가? 
 
         self.previous_point = None                   # 이전 스텝 포인트 
@@ -117,6 +118,7 @@ class BaseEnvironment(ABC):
             obs_{t+1}, reward, done, event, mask
         """
         # 0) 이전 상태 캐시(체결/정산 전 스냅샷)
+        self.cost = 0.0
         self.account.cache_values()
 
         # 1) 데이터 전진
@@ -148,6 +150,7 @@ class BaseEnvironment(ABC):
 
         # 7) 다음 상태 생성
         next_state_obj = self._build_next_state(next_ts_state)
+        self.cost = cost 
 
         # 8) 보상 계산
         reward = self._compute_reward(event=self.step_event)
@@ -159,6 +162,7 @@ class BaseEnvironment(ABC):
 
         # 10) 거래 정보를 업데이트 
         self._update_trades_info()
+        
 
         return obs, reward, done, mask
     
@@ -196,11 +200,18 @@ class BaseEnvironment(ABC):
             current_unrealized_pnl=self.account.unrealized_pnl,
             prev_balance=self.account.prev_balance,
             current_balance=self.account.balance,
+            prev_equity=self.account.prev_equity,
+            current_equity=self.account.equity,
             prev_position=self.account.prev_position,
             current_position=self.account.current_position,
             point_delta=self.point_delta,
             execution_strength=self.account.execution_strength,
-            prev_execution_strength=self.account.prev_execution_strength
+            prev_execution_strength=self.account.prev_execution_strength,
+            prev_equity_without_cost=self.account.prev_equity_without_cost,
+            current_equity_without_cost=self.account.equity_without_cost,   
+            prev_drawdown=self.account.prev_drawdown,
+            current_drawdown=self.account.drawdown,
+            cost=self.cost
         )
         return self.get_reward(rinfo, event=event)      # single critic in R, multi critics in R^3
 
@@ -272,7 +283,7 @@ class BaseEnvironment(ABC):
         Multi-Critics PPO에서 사용하는 α 초기화, single critic에서는 사용하지 않는다.
         한 에피소드 동안 고정된다. 
         """
-        self.alpha = torch.tensor([0.4, 0.2, 0.4], dtype=torch.float32)
+        self.alpha = torch.tensor([0.6, 0.2, 0.2], dtype=torch.float32)
         # self.alpha = Dirichlet(torch.tensor(self.alpha_parameters, dtype=torch.float32)).sample().detach()
 
     def _get_market_open_close_timestep(self, df) -> pd.DataFrame:

@@ -1,10 +1,10 @@
 algo: MultiCriticsPPOAgent
-n_steps: 1000
+n_steps: 300
 batch_size: 256 # 1260
 value_coeff: 0.6
 entropy_coeff:
-  start: 0.01
-  end: 0.001
+  start: 0.1
+  end: 0.003
   steps: 1000
 clip_eps: 0.20
 gamma: 0.95
